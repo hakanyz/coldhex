@@ -53,3 +53,29 @@ install(TARGETS probedesk
 )
 
 qt_finalize_executable(probedesk)
+
+option(PROBEDESK_BUILD_TESTS "Build unit tests" ON)
+if(PROBEDESK_BUILD_TESTS)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    add_executable(tst_flashcoordinator
+        tests/tst_flashcoordinator.cpp
+        tests/MockEngine.h
+        src/core/FlashCoordinator.cpp
+        src/core/FlashCoordinator.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_flashcoordinator PRIVATE src tests)
+    target_link_libraries(tst_flashcoordinator PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_flashcoordinator COMMAND tst_flashcoordinator)
+
+    add_executable(tst_hexparser
+        tests/tst_hexparser.cpp
+        src/core/HexParser.cpp
+        src/core/HexParser.h
+    )
+    target_include_directories(tst_hexparser PRIVATE src)
+    target_link_libraries(tst_hexparser PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_hexparser COMMAND tst_hexparser)
+endif()
