@@ -173,6 +173,65 @@ private slots:
         QCOMPARE(finished.count(), 1);
         QVERIFY(!finished.first().at(0).toBool());
     }
+
+    void verifySequenceOnlyComparesSlots() {
+        MockEngine engine;
+        FlashCoordinator coord(&engine);
+        setup(coord, makeConfig());
+        QSignalSpy finished(&coord, &FlashCoordinator::sequenceFinished);
+
+        coord.startVerifySequence();
+        for (int i = 0; i < 3; ++i) engine.finish(true);
+
+        QCOMPARE(engine.commands, (QStringList{
+            "connect@4000",
+            "verify:boot.hex@0x8000000",
+            "verify:app.hex@0x8008000"}));
+        QCOMPARE(finished.count(), 1);
+        QVERIFY(finished.first().at(0).toBool());
+    }
+
+    void verifyMismatchIsNotRetriedAtLowerSpeed() {
+        MockEngine engine;
+        FlashCoordinator coord(&engine);
+        setup(coord, makeConfig());
+        QSignalSpy fallback(&coord, &FlashCoordinator::autoSpeedFallbackTriggered);
+        QSignalSpy finished(&coord, &FlashCoordinator::sequenceFinished);
+
+        coord.startVerifySequence();
+        engine.finish(true);   // connect
+        engine.finish(false);  // slot 1 differs from the file
+
+        QCOMPARE(fallback.count(), 0);
+        QCOMPARE(finished.count(), 1);
+        QVERIFY(!finished.first().at(0).toBool());
+        QVERIFY(finished.first().at(1).toString().contains("Verification failed"));
+    }
+
+    void verifyConnectionFailureStillFallsBack() {
+        MockEngine engine;
+        FlashCoordinator coord(&engine);
+        setup(coord, makeConfig(4000));
+
+        coord.startVerifySequence();
+        engine.finish(false);  // connect@4000 fails
+        QCOMPARE(engine.commands.last(), QString("connect@2000"));
+    }
+
+    void verifyRejectsSlotsWithoutFiles() {
+        MockEngine engine;
+        FlashCoordinator coord(&engine);
+        coord.setTargetConfig(makeConfig());
+        FirmwareSlot s = makeSlot("", 0x08000000);
+        coord.setSlot1(s);
+        QSignalSpy finished(&coord, &FlashCoordinator::sequenceFinished);
+
+        coord.startVerifySequence();
+
+        QCOMPARE(finished.count(), 1);
+        QVERIFY(!finished.first().at(0).toBool());
+        QVERIFY(engine.commands.isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestFlashCoordinator)

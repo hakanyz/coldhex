@@ -59,6 +59,23 @@ private slots:
         QVERIFY(!ChipCatalog::find(chips, "STM32F407VGT6"));
         QVERIFY(!ChipCatalog::find(chips, ""));
     }
+
+    void customChipsFormTheirOwnGroup() {
+        QList<ChipEntry> chips = sample();
+        chips.append({"Custom: APM32F1 Series", "APM32F103C8", "C:/chips/apm32f1.yaml"});
+
+        const QStringList m = ChipCatalog::manufacturers(chips);
+        QVERIFY(m.contains("APM32 / Geehy"));  // by name prefix
+        QVERIFY(m.contains("Custom files"));
+        QCOMPARE(ChipCatalog::chipNames(chips, "Custom files"), (QStringList{"APM32F103C8"}));
+        QCOMPARE(ChipCatalog::chipNames(chips, "APM32 / Geehy"), (QStringList{"APM32F103C8"}));
+
+        const ChipEntry* entry = ChipCatalog::findEntry(chips, "apm32f103c8");
+        QVERIFY(entry);
+        QCOMPARE(entry->descriptionFile, QString("C:/chips/apm32f1.yaml"));
+        QVERIFY(ChipCatalog::findEntry(chips, "STM32F407VG")->descriptionFile.isEmpty());
+        QVERIFY(!ChipCatalog::findEntry(chips, "nothing"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestChipCatalog)

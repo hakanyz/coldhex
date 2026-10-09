@@ -11,8 +11,12 @@ class MockEngine : public IProgrammerEngine {
 public:
     explicit MockEngine(QObject* parent = nullptr) : IProgrammerEngine(parent) {}
 
-    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) override {
-        configured << QString("%1@%2:%3").arg(chipName).arg(speedKhz).arg(probeId);
+    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId, const QString& descriptionPath) override {
+        configured << QString("%1@%2:%3:%4").arg(chipName).arg(speedKhz).arg(probeId, descriptionPath);
+    }
+    void verifyFile(const QString& filePath, uint32_t baseAddress) override {
+        commands << QString("verify:%1@0x%2").arg(filePath).arg(baseAddress, 0, 16);
+        m_busy = true;
     }
 
     bool connectTarget(const QString&, uint32_t speedKhz, const QString&) override {

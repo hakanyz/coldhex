@@ -17,6 +17,7 @@ enum class EngineLogLevel {
 struct ChipEntry {
     QString family;  // e.g. "STM32F4 Series"
     QString name;    // name accepted by --chip, e.g. "STM32F407VG"
+    QString descriptionFile;  // set for chips that come from a user-supplied YAML file
 };
 
 struct ProbeInfo {
@@ -43,7 +44,8 @@ public:
 
     // Sets chip, speed and probe used by the following commands. Switching chip or
     // probe drops an existing connection.
-    virtual void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
+    virtual void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString(),
+                                 const QString& chipDescriptionPath = QString()) = 0;
     virtual bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
     virtual void disconnectTarget() = 0;
     virtual bool isConnected() const = 0;
@@ -51,6 +53,7 @@ public:
 
     virtual void eraseTarget(bool fullErase = true) = 0;
     virtual void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) = 0;
+    virtual void verifyFile(const QString& filePath, uint32_t baseAddress) = 0;
     virtual void resetTarget(bool halt = false) = 0;
     virtual void cancelCurrentOperation() = 0;
 

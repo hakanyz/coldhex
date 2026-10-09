@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QString>
+#include <QStringList>
 
 class QSettings;
 
@@ -20,6 +21,7 @@ struct UiSettings {
     QString slot2Path;
     QString slot1Address;
     QString slot2Address;
+    QStringList customChipFiles;
     bool slot1Enabled = true;
     bool slot2Enabled = true;
 

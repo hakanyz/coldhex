@@ -10,6 +10,7 @@
 class ChipCatalog {
 public:
     static QString allChipsLabel();
+    static QString customChipsLabel();
 
     // "All chips" first, then every known manufacturer that has at least one chip.
     static QStringList manufacturers(const QList<ChipEntry>& chips);
@@ -19,4 +20,7 @@ public:
 
     // Case-insensitive exact lookup; returns the engine's spelling in `canonicalName`.
     static bool find(const QList<ChipEntry>& chips, const QString& name, QString* canonicalName = nullptr);
+
+    // Same lookup, returning the entry itself (null when not found).
+    static const ChipEntry* findEntry(const QList<ChipEntry>& chips, const QString& name);
 };

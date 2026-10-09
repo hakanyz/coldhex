@@ -11,6 +11,8 @@ enum class CoordinatorStep {
     Erasing,
     FlashingSlot1,
     FlashingSlot2,
+    VerifyingSlot1,
+    VerifyingSlot2,
     Resetting
 };
 
@@ -30,6 +32,8 @@ public:
     FirmwareSlot slot2() const;
 
     void startFlashSequence();
+    // Compares the enabled slot files with the target without writing anything.
+    void startVerifySequence();
     void cancelSequence();
 
 signals:
@@ -44,6 +48,7 @@ private slots:
     void onEngineProgressChanged(int percentage, const QString& statusText);
 
 private:
+    bool checkRequest();
     void executeNextStep();
     void handleStepFailure(const QString& errorMsg);
     bool stepDownSpeed();
@@ -56,6 +61,7 @@ private:
     CoordinatorStep m_currentStep = CoordinatorStep::Idle;
     QVector<CoordinatorStep> m_plannedSteps;
     int m_currentStepIndex = 0;
+    bool m_verifyOnly = false;
 
     const QVector<uint32_t> m_speedFallbackTable = {10000, 4000, 2000, 1000, 500, 100};
 };

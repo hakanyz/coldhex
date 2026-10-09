@@ -33,6 +33,10 @@ QString ChipCatalog::allChipsLabel() {
     return QStringLiteral("All chips");
 }
 
+QString ChipCatalog::customChipsLabel() {
+    return QStringLiteral("Custom files");
+}
+
 QStringList ChipCatalog::manufacturers(const QList<ChipEntry>& chips) {
     QStringList result{allChipsLabel()};
     for (const ManufacturerRule& rule : rules()) {
@@ -41,6 +45,12 @@ QStringList ChipCatalog::manufacturers(const QList<ChipEntry>& chips) {
                 result << QString::fromLatin1(rule.label);
                 break;
             }
+        }
+    }
+    for (const ChipEntry& chip : chips) {
+        if (!chip.descriptionFile.isEmpty()) {
+            result << customChipsLabel();
+            break;
         }
     }
     return result;
@@ -54,20 +64,25 @@ QStringList ChipCatalog::chipNames(const QList<ChipEntry>& chips, const QString&
     }
 
     for (const ChipEntry& chip : chips) {
-        if (manufacturer == allChipsLabel() || (selected && matches(*selected, chip.name))) {
+        const bool custom = (manufacturer == customChipsLabel()) && !chip.descriptionFile.isEmpty();
+        if (manufacturer == allChipsLabel() || custom || (selected && matches(*selected, chip.name))) {
             names << chip.name;
         }
     }
     return names;
 }
 
-bool ChipCatalog::find(const QList<ChipEntry>& chips, const QString& name, QString* canonicalName) {
+const ChipEntry* ChipCatalog::findEntry(const QList<ChipEntry>& chips, const QString& name) {
     const QString wanted = name.trimmed();
     for (const ChipEntry& chip : chips) {
-        if (chip.name.compare(wanted, Qt::CaseInsensitive) == 0) {
-            if (canonicalName) *canonicalName = chip.name;
-            return true;
-        }
+        if (chip.name.compare(wanted, Qt::CaseInsensitive) == 0) return &chip;
     }
-    return false;
+    return nullptr;
+}
+
+bool ChipCatalog::find(const QList<ChipEntry>& chips, const QString& name, QString* canonicalName) {
+    const ChipEntry* entry = findEntry(chips, name);
+    if (!entry) return false;
+    if (canonicalName) *canonicalName = entry->name;
+    return true;
 }

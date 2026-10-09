@@ -20,7 +20,8 @@ public:
     explicit ProbeRsEngine(QObject* parent = nullptr);
     ~ProbeRsEngine() override;
 
-    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) override;
+    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString(),
+                         const QString& chipDescriptionPath = QString()) override;
     bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) override;
     void disconnectTarget() override;
     bool isConnected() const override;
@@ -28,6 +29,7 @@ public:
 
     void eraseTarget(bool fullErase = true) override;
     void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) override;
+    void verifyFile(const QString& filePath, uint32_t baseAddress) override;
     void resetTarget(bool halt = false) override;
     void cancelCurrentOperation() override;
 
@@ -54,6 +56,8 @@ private slots:
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription);
     void parseOutputLine(const QString& line, bool isError);
+    QStringList targetArgs() const;
+    static QStringList imageFormatArgs(const QString& filePath, uint32_t baseAddress);
     void drainOutput(QByteArray& buffer, const QByteArray& chunk, bool isError, bool flushRemainder = false);
 
     QString m_executablePath = "probe-rs";
@@ -68,6 +72,7 @@ private:
     QString m_currentChip;
     uint32_t m_currentSpeedKhz = 4000;
     QString m_currentProbeId;
+    QString m_currentChipDescriptionPath;
     QString m_currentActionDescription;
 
     QRegularExpression m_progressRegex;

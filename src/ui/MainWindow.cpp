@@ -2,6 +2,7 @@
 #include "ui_MainWindow.h"
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
+#include "engine/ChipDescription.h"
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QSettings>
@@ -42,11 +43,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
+    connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
     connect(ui->actionResetTarget, &QAction::triggered, this, &MainWindow::onResetTargetTriggered);
     connect(ui->actionOpenHex, &QAction::triggered, this, &MainWindow::onOpenHexTriggered);
     connect(ui->actionClearLog, &QAction::triggered, ui->textLog, &QPlainTextEdit::clear);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
+    connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
+    connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
     // Settings Panel Controls
     connect(ui->comboManufacturer, &QComboBox::currentTextChanged, this, &MainWindow::onManufacturerChanged);
@@ -97,6 +101,7 @@ void MainWindow::restoreSettings() {
 
     m_pendingManufacturer = s.manufacturer;
     m_pendingChip = s.chip;
+    m_customChipFiles = s.customChipFiles;
     ui->comboModel->setEditText(s.chip);
     selectIfPresent(ui->comboProbe, s.probe);
     selectIfPresent(ui->comboInterface, s.interfaceName);
@@ -124,6 +129,7 @@ void MainWindow::saveSettings() {
     s.slot2Path = ui->editSlot2Path->text();
     s.slot1Address = ui->editSlot1Address->text();
     s.slot2Address = ui->editSlot2Address->text();
+    s.customChipFiles = m_customChipFiles;
     s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
     s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
     s.geometry = saveGeometry();
@@ -153,11 +159,10 @@ void MainWindow::setupUiCustomizations() {
     ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-    // Not implemented yet: keep them disabled instead of faking a result.
+    // Not implemented yet: keep it disabled instead of faking a result.
     ui->actionRead->setEnabled(false);
     ui->actionRead->setToolTip("Read target memory - not implemented yet");
-    ui->actionVerify->setEnabled(false);
-    ui->actionVerify->setToolTip("Verify against file - not implemented yet (Program already verifies)");
+    ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
 
     ui->statusBar->showMessage("Ready");
 }
@@ -214,32 +219,90 @@ void MainWindow::onManufacturerChanged(const QString& manufacturer) {
 }
 
 void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error) {
-    if (!success) {
+    m_builtinChipsLoaded = success;
+    if (success) {
+        m_builtinChips = chips;
+        appendLog("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
+    } else {
+        m_builtinChips.clear();
         appendLog("ERROR", QString("Chip list unavailable: %1").arg(error), "#ff5555");
         appendLog("WARNING", "Chip names cannot be checked; type the exact probe-rs chip name.");
+    }
+    rebuildChipCatalog();
+}
+
+// Merges probe-rs' own chips with the ones from the user's chip description files and
+// refreshes the manufacturer and model boxes.
+void MainWindow::rebuildChipCatalog() {
+    m_chips = m_builtinChips;
+    for (const QString& path : m_customChipFiles) {
+        QString family;
+        QString error;
+        const QStringList names = ChipDescription::variantNamesFromFile(path, &family, &error);
+        if (names.isEmpty()) {
+            appendLog("ERROR", error, "#ff5555");
+            continue;
+        }
+        for (const QString& name : names) {
+            m_chips.append({"Custom: " + family, name, path});
+        }
+        appendLog("INFO", QString("Chip description '%1': %2 chips (%3).")
+                              .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
+    }
+
+    if (m_chips.isEmpty()) {
         ui->comboModel->setEditText(m_pendingChip);
         return;
     }
 
-    m_chips = chips;
-    appendLog("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
-
-    const QStringList makers = ChipCatalog::manufacturers(m_chips);
+    const QString wantedMaker = m_pendingManufacturer.isEmpty() ? ui->comboManufacturer->currentText() : m_pendingManufacturer;
     ui->comboManufacturer->blockSignals(true);
     ui->comboManufacturer->clear();
-    ui->comboManufacturer->addItems(makers);
-    int makerIdx = ui->comboManufacturer->findText(m_pendingManufacturer);
+    ui->comboManufacturer->addItems(ChipCatalog::manufacturers(m_chips));
+    int makerIdx = ui->comboManufacturer->findText(wantedMaker);
     if (makerIdx < 0) makerIdx = ui->comboManufacturer->findText("STM32");
     ui->comboManufacturer->setCurrentIndex(makerIdx >= 0 ? makerIdx : 0);
     ui->comboManufacturer->blockSignals(false);
 
-    ui->comboModel->setEditText(m_pendingChip);
+    const QString wantedChip = m_pendingChip.isEmpty() ? ui->comboModel->currentText() : m_pendingChip;
+    ui->comboModel->setEditText(wantedChip);
     onManufacturerChanged(ui->comboManufacturer->currentText());
 
     QString canonical;
-    if (!m_pendingChip.isEmpty() && ChipCatalog::find(m_chips, m_pendingChip, &canonical)) {
+    if (!wantedChip.isEmpty() && ChipCatalog::find(m_chips, wantedChip, &canonical)) {
         ui->comboModel->setEditText(canonical);
     }
+    m_pendingManufacturer.clear();
+    m_pendingChip.clear();
+}
+
+void MainWindow::onAddChipFileTriggered() {
+    const QString path = QFileDialog::getOpenFileName(this, "Add Chip Description File", "",
+                                                      "probe-rs chip description (*.yaml *.yml);;All Files (*.*)");
+    if (path.isEmpty()) return;
+
+    if (m_customChipFiles.contains(path)) {
+        appendLog("INFO", "That chip description file is already added.");
+        return;
+    }
+
+    QString family;
+    QString error;
+    if (ChipDescription::variantNamesFromFile(path, &family, &error).isEmpty()) {
+        appendLog("ERROR", error, "#ff5555");
+        QMessageBox::warning(this, "Invalid Chip Description", error);
+        return;
+    }
+
+    m_customChipFiles << path;
+    rebuildChipCatalog();
+}
+
+void MainWindow::onClearChipFilesTriggered() {
+    if (m_customChipFiles.isEmpty()) return;
+    m_customChipFiles.clear();
+    appendLog("INFO", "Custom chip description files removed.");
+    rebuildChipCatalog();
 }
 
 // Pushes the chip, speed and probe currently shown in the UI to the engine, so erase, reset
@@ -247,7 +310,10 @@ void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, co
 bool MainWindow::prepareEngine() {
     QString chip;
     if (!resolveChip(chip)) return false;
-    m_engine->configureTarget(chip, ui->spinSpeed->value(), ui->comboProbe->currentData().toString());
+
+    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
+    const QString descriptionFile = entry ? entry->descriptionFile : QString();
+    m_engine->configureTarget(chip, ui->spinSpeed->value(), ui->comboProbe->currentData().toString(), descriptionFile);
     return true;
 }
 
@@ -258,17 +324,20 @@ bool MainWindow::resolveChip(QString& chip) {
         QMessageBox::warning(this, "No Chip Selected", "Please select or type a target chip.");
         return false;
     }
-    if (m_chips.isEmpty()) return true;  // list unavailable; let probe-rs judge
 
     QString canonical;
-    if (!ChipCatalog::find(m_chips, chip, &canonical)) {
-        const QString msg = QString("'%1' is not a chip name known to probe-rs. Pick one from the list.").arg(chip);
-        appendLog("ERROR", msg, "#ff5555");
-        QMessageBox::warning(this, "Unknown Chip", msg);
-        return false;
+    if (ChipCatalog::find(m_chips, chip, &canonical)) {
+        chip = canonical;
+        return true;
     }
-    chip = canonical;
-    return true;
+
+    // Without probe-rs' own list a typed name cannot be checked; let probe-rs judge it.
+    if (!m_builtinChipsLoaded) return true;
+
+    const QString msg = QString("'%1' is not a chip name known to probe-rs. Pick one from the list.").arg(chip);
+    appendLog("ERROR", msg, "#ff5555");
+    QMessageBox::warning(this, "Unknown Chip", msg);
+    return false;
 }
 
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
@@ -284,6 +353,7 @@ void MainWindow::updateUiState() {
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
     ui->actionErase->setEnabled(!busy);
     ui->actionProgram->setEnabled(!busy);
+    ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
 }
 
@@ -317,10 +387,10 @@ void MainWindow::onRefreshProbesTriggered() {
 }
 
 void MainWindow::onConnectTriggered() {
-    QString chip;
-    if (!resolveChip(chip)) return;
-    uint32_t speed = ui->spinSpeed->value();
-    QString probe = ui->comboProbe->currentData().toString();
+    if (!prepareEngine()) return;
+    const QString chip = ui->comboModel->currentText().trimmed();
+    const uint32_t speed = ui->spinSpeed->value();
+    const QString probe = ui->comboProbe->currentData().toString();
 
     m_isOperationRunning = true;
     updateUiState();
@@ -345,25 +415,24 @@ void MainWindow::onEraseTriggered() {
     m_engine->eraseTarget(true);
 }
 
-void MainWindow::onProgramTriggered() {
-    TargetConfig cfg;
-    if (!resolveChip(cfg.chipName)) return;
+// Collects target settings and both slots from the UI and checks them. Returns false (after
+// telling the user why) when the run must not start.
+bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2) {
+    if (!resolveChip(cfg.chipName)) return false;
     cfg.speedKhz = ui->spinSpeed->value();
     cfg.autoSpeedEnabled = true;
     cfg.eraseBeforeFlash = true;
     cfg.verifyAfterFlash = true;
     cfg.resetAfterFlash = true;
 
-    FirmwareSlot s1;
-    FirmwareSlot s2;
     AddressRange range1;
     AddressRange range2;
     if (!buildSlot(1, s1, range1) || !buildSlot(2, s2, range2)) {
-        return;
+        return false;
     }
 
     if (s1.enabled && s2.enabled && SlotValidator::overlaps(range1, range2)) {
-        const QString msg = QString("Slot 1 (0x%1 - 0x%2) and Slot 2 (0x%3 - 0x%4) overlap. "
+        const QString msg = QString("Slot 1 (0x%1 - 0x%2) and Slot 2 (0x%3 - 0x%4) overlap, so both cannot be on the target. "
                                     "Flashing would overwrite the bootloader.")
                                 .arg(range1.start, 8, 16, QLatin1Char('0'))
                                 .arg(uint64_t(range1.start) + range1.size - 1, 8, 16, QLatin1Char('0'))
@@ -371,16 +440,36 @@ void MainWindow::onProgramTriggered() {
                                 .arg(uint64_t(range2.start) + range2.size - 1, 8, 16, QLatin1Char('0'));
         appendLog("ERROR", msg, "#ff5555");
         QMessageBox::warning(this, "Address Overlap", msg);
-        return;
+        return false;
     }
 
-    if (!prepareEngine()) return;
+    return prepareEngine();
+}
+
+void MainWindow::onProgramTriggered() {
+    TargetConfig cfg;
+    FirmwareSlot s1;
+    FirmwareSlot s2;
+    if (!prepareFirmwareRun(cfg, s1, s2)) return;
 
     m_coordinator->setTargetConfig(cfg);
     m_coordinator->setSlot1(s1);
     m_coordinator->setSlot2(s2);
 
     m_coordinator->startFlashSequence();
+}
+
+void MainWindow::onVerifyTriggered() {
+    TargetConfig cfg;
+    FirmwareSlot s1;
+    FirmwareSlot s2;
+    if (!prepareFirmwareRun(cfg, s1, s2)) return;
+
+    m_coordinator->setTargetConfig(cfg);
+    m_coordinator->setSlot1(s1);
+    m_coordinator->setSlot2(s2);
+
+    m_coordinator->startVerifySequence();
 }
 
 bool MainWindow::slotAddress(int slotIndex, uint32_t& address) const {

@@ -8,6 +8,7 @@
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
 #include "core/ChipCatalog.h"
+#include "engine/ChipDescription.h"
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
 
@@ -31,6 +32,7 @@ private slots:
     void onDisconnectTriggered();
     void onEraseTriggered();
     void onProgramTriggered();
+    void onVerifyTriggered();
     void onResetTargetTriggered();
     void onOpenHexTriggered();
     void onRefreshProbesTriggered();
@@ -38,6 +40,8 @@ private slots:
     // Settings Panel Controls
     void onManufacturerChanged(const QString& manufacturer);
     void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
+    void onAddChipFileTriggered();
+    void onClearChipFilesTriggered();
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
     void onSlot1PathChanged(const QString& path);
@@ -70,6 +74,8 @@ private:
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
     bool resolveChip(QString& chip);
     bool prepareEngine();
+    bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
+    void rebuildChipCatalog();
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;
@@ -85,7 +91,10 @@ private:
     QByteArray m_targetReadData;
     uint32_t m_targetReadBaseAddress = 0x08000000;
 
-    QList<ChipEntry> m_chips;
+    QList<ChipEntry> m_builtinChips;  // reported by probe-rs
+    QList<ChipEntry> m_chips;         // built-in plus custom
+    QStringList m_customChipFiles;
+    bool m_builtinChipsLoaded = false;
     QString m_pendingManufacturer;  // restored from settings, applied once the chip list arrives
     QString m_pendingChip;
 

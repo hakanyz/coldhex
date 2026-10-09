@@ -35,21 +35,54 @@ FirmwareSlot FlashCoordinator::slot2() const {
     return m_slot2;
 }
 
-void FlashCoordinator::startFlashSequence() {
+bool FlashCoordinator::checkRequest() {
     if (!m_engine) {
         emit sequenceFinished(false, "Programmer engine is not initialized.");
-        return;
+        return false;
     }
 
     if (m_config.chipName.trimmed().isEmpty()) {
         emit sequenceFinished(false, "Please select a target microcontroller chip.");
-        return;
+        return false;
     }
 
     if (!m_slot1.enabled && !m_slot2.enabled) {
         emit sequenceFinished(false, "At least one firmware slot (Bootloader or Application) must be enabled.");
+        return false;
+    }
+    return true;
+}
+
+void FlashCoordinator::startVerifySequence() {
+    if (!checkRequest()) return;
+
+    m_verifyOnly = true;
+    m_plannedSteps.clear();
+    m_currentStepIndex = 0;
+
+    if (!m_engine->isConnected()) {
+        m_plannedSteps.append(CoordinatorStep::Connecting);
+    }
+    if (m_slot1.enabled && !m_slot1.filePath.isEmpty()) {
+        m_plannedSteps.append(CoordinatorStep::VerifyingSlot1);
+    }
+    if (m_slot2.enabled && !m_slot2.filePath.isEmpty()) {
+        m_plannedSteps.append(CoordinatorStep::VerifyingSlot2);
+    }
+
+    if (m_plannedSteps.isEmpty() || m_plannedSteps.last() == CoordinatorStep::Connecting) {
+        m_plannedSteps.clear();
+        emit sequenceFinished(false, "No firmware file to verify.");
         return;
     }
+
+    emit sequenceStarted();
+    executeNextStep();
+}
+
+void FlashCoordinator::startFlashSequence() {
+    if (!checkRequest()) return;
+    m_verifyOnly = false;
 
     m_plannedSteps.clear();
     m_currentStepIndex = 0;
@@ -92,7 +125,7 @@ void FlashCoordinator::executeNextStep() {
     if (m_currentStepIndex >= m_plannedSteps.size()) {
         m_currentStep = CoordinatorStep::Idle;
         emit totalProgressChanged(100);
-        emit sequenceFinished(true, "All flashing and verification steps completed successfully!");
+        emit sequenceFinished(true, m_verifyOnly ? "Target memory matches the selected files." : "All flashing and verification steps completed successfully!");
         return;
     }
 
@@ -119,6 +152,16 @@ void FlashCoordinator::executeNextStep() {
     case CoordinatorStep::FlashingSlot2:
         emit stepChanged(QString("Flashing Slot 2: %1").arg(m_slot2.label), current, total);
         m_engine->programFile(m_slot2.filePath, m_slot2.startAddress, m_config.verifyAfterFlash);
+        break;
+
+    case CoordinatorStep::VerifyingSlot1:
+        emit stepChanged(QString("Verifying Slot 1: %1").arg(m_slot1.label), current, total);
+        m_engine->verifyFile(m_slot1.filePath, m_slot1.startAddress);
+        break;
+
+    case CoordinatorStep::VerifyingSlot2:
+        emit stepChanged(QString("Verifying Slot 2: %1").arg(m_slot2.label), current, total);
+        m_engine->verifyFile(m_slot2.filePath, m_slot2.startAddress);
         break;
 
     case CoordinatorStep::Resetting:
@@ -158,6 +201,15 @@ void FlashCoordinator::onEngineProgressChanged(int percentage, const QString& st
 }
 
 void FlashCoordinator::handleStepFailure(const QString& errorMsg) {
+    // A mismatch found by a plain verify is a result, not a link problem, so do not retry it slower.
+    const bool verifyMismatch = m_verifyOnly
+        && (m_currentStep == CoordinatorStep::VerifyingSlot1 || m_currentStep == CoordinatorStep::VerifyingSlot2);
+    if (verifyMismatch) {
+        m_currentStep = CoordinatorStep::Idle;
+        emit sequenceFinished(false, QString("Verification failed: %1").arg(errorMsg));
+        return;
+    }
+
     if (m_config.autoSpeedEnabled && stepDownSpeed()) {
         emit autoSpeedFallbackTriggered(m_config.speedKhz);
         // Resume from the failed step instead of restarting, so steps that already

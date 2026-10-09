@@ -50,12 +50,15 @@ bool ProbeRsEngine::isBusy() const {
     return m_state != EngineState::Idle;
 }
 
-void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
-    const bool targetChanged = (chipName != m_currentChip) || (probeId != m_currentProbeId);
+void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId,
+                                    const QString& chipDescriptionPath) {
+    const bool targetChanged = (chipName != m_currentChip) || (probeId != m_currentProbeId)
+                               || (chipDescriptionPath != m_currentChipDescriptionPath);
 
     m_currentChip = chipName;
     m_currentSpeedKhz = speedKhz;
     m_currentProbeId = probeId;
+    m_currentChipDescriptionPath = chipDescriptionPath;
 
     if (targetChanged && m_connected && !isBusy()) {
         m_connected = false;
@@ -63,19 +66,41 @@ void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, 
     }
 }
 
+// Arguments every probe-rs command needs to find the right chip and probe.
+QStringList ProbeRsEngine::targetArgs() const {
+    // --non-interactive: probe-rs must never wait for a probe choice on a terminal we do not have.
+    QStringList args = {"--chip", m_currentChip, "--non-interactive"};
+    if (!m_currentChipDescriptionPath.isEmpty()) {
+        args << "--chip-description-path" << m_currentChipDescriptionPath;
+    }
+    if (m_currentSpeedKhz > 0) {
+        args << "--speed" << QString::number(m_currentSpeedKhz);
+    }
+    if (!m_currentProbeId.isEmpty()) {
+        args << "--probe" << m_currentProbeId;
+    }
+    return args;
+}
+
+// probe-rs only honours --base-address together with --binary-format bin.
+QStringList ProbeRsEngine::imageFormatArgs(const QString& filePath, uint32_t baseAddress) {
+    const QString suffix = QFileInfo(filePath).suffix();
+    if (suffix.compare("bin", Qt::CaseInsensitive) == 0) {
+        return {"--binary-format", "bin", "--base-address", QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'))};
+    }
+    if (suffix.compare("hex", Qt::CaseInsensitive) == 0 || suffix.compare("ihex", Qt::CaseInsensitive) == 0) {
+        return {"--binary-format", "hex"};
+    }
+    return {};
+}
+
 bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
     if (isBusy()) return false;
 
-    configureTarget(chipName, speedKhz, probeId);
+    // Keep the chip description chosen by configureTarget(); only chip, speed and probe may change here.
+    configureTarget(chipName, speedKhz, probeId, m_currentChipDescriptionPath);
 
-    QStringList args = {"info", "--chip", chipName};
-    if (speedKhz > 0) {
-        args << "--speed" << QString::number(speedKhz);
-    }
-    if (!probeId.isEmpty()) {
-        args << "--probe" << probeId;
-    }
-
+    QStringList args = QStringList{"info"} + targetArgs();
     runCommand(args, EngineState::Connecting, QString("Connecting to target: %1 (%2 kHz)").arg(chipName).arg(speedKhz));
     return true;
 }
@@ -93,55 +118,36 @@ void ProbeRsEngine::eraseTarget(bool fullErase) {
     if (isBusy()) return;
     Q_UNUSED(fullErase);
 
-    QStringList args = {"erase", "--chip", m_currentChip};
-    if (m_currentSpeedKhz > 0) {
-        args << "--speed" << QString::number(m_currentSpeedKhz);
-    }
-    if (!m_currentProbeId.isEmpty()) {
-        args << "--probe" << m_currentProbeId;
-    }
-
-    runCommand(args, EngineState::Erasing, "Erasing target chip (Chip Erase)...");
+    runCommand(QStringList{"erase"} + targetArgs(), EngineState::Erasing, "Erasing target chip (Chip Erase)...");
 }
 
 void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, bool verify) {
     if (isBusy()) return;
 
-    QStringList args = {"download", "--chip", m_currentChip};
-    if (m_currentSpeedKhz > 0) {
-        args << "--speed" << QString::number(m_currentSpeedKhz);
-    }
-    if (!m_currentProbeId.isEmpty()) {
-        args << "--probe" << m_currentProbeId;
-    }
+    QStringList args = QStringList{"download"} + targetArgs();
     if (verify) {
         args << "--verify";
     }
-
-    QFileInfo fi(filePath);
-    // probe-rs only honours --base-address together with --binary-format bin.
-    if (fi.suffix().compare("bin", Qt::CaseInsensitive) == 0) {
-        args << "--binary-format" << "bin"
-             << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
-    } else if (fi.suffix().compare("hex", Qt::CaseInsensitive) == 0 || fi.suffix().compare("ihex", Qt::CaseInsensitive) == 0) {
-        args << "--binary-format" << "hex";
-    }
-
+    args += imageFormatArgs(filePath, baseAddress);
     args << filePath;
 
-    runCommand(args, EngineState::Programming, QString("Flashing: %1").arg(fi.fileName()));
+    runCommand(args, EngineState::Programming, QString("Flashing: %1").arg(QFileInfo(filePath).fileName()));
+}
+
+void ProbeRsEngine::verifyFile(const QString& filePath, uint32_t baseAddress) {
+    if (isBusy()) return;
+
+    QStringList args = QStringList{"verify"} + targetArgs();
+    args += imageFormatArgs(filePath, baseAddress);
+    args << filePath;
+
+    runCommand(args, EngineState::Verifying, QString("Verifying: %1").arg(QFileInfo(filePath).fileName()));
 }
 
 void ProbeRsEngine::resetTarget(bool halt) {
     if (isBusy()) return;
 
-    QStringList args = {"reset", "--chip", m_currentChip};
-    if (m_currentSpeedKhz > 0) {
-        args << "--speed" << QString::number(m_currentSpeedKhz);
-    }
-    if (!m_currentProbeId.isEmpty()) {
-        args << "--probe" << m_currentProbeId;
-    }
+    QStringList args = QStringList{"reset"} + targetArgs();
     if (halt) {
         args << "--halt";
     }

@@ -29,6 +29,8 @@ set(SOURCES
     src/core/SlotValidator.cpp
     src/core/ChipCatalog.h
     src/core/ChipCatalog.cpp
+    src/engine/ChipDescription.h
+    src/engine/ChipDescription.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -124,4 +126,13 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_chipcatalog PRIVATE src)
     target_link_libraries(tst_chipcatalog PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_chipcatalog COMMAND tst_chipcatalog)
+
+    add_executable(tst_chipdescription
+        tests/tst_chipdescription.cpp
+        src/engine/ChipDescription.cpp
+        src/engine/ChipDescription.h
+    )
+    target_include_directories(tst_chipdescription PRIVATE src)
+    target_link_libraries(tst_chipdescription PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_chipdescription COMMAND tst_chipdescription)
 endif()
