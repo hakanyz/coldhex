@@ -186,7 +186,7 @@ void MainWindow::setupDeviceDatabase() {
     ui->comboManufacturer->setCurrentText("STM32");
 
     // Probes
-    ui->comboProbe->addItems({"RailLink", "J-Link", "CMSIS-DAP"});
+    ui->comboProbe->addItems({"J-Link", "ST-Link", "CMSIS-DAP"});
 
     // Interfaces
     ui->comboInterface->addItems({"SWD", "JTAG"});

@@ -5,7 +5,7 @@ ProbeDesk is a modern, modular desktop flashing and management utility for ARM C
 ## Key Features
 
 - **Broad Microcontroller Ecosystem:** CMSIS-Pack powered support for Cortex-M families (STM32, GD32, Geehy, TI, Nuvoton, etc.)
-- **Hardware Debug Probe Support:** J-Link, RailLink, and CMSIS-DAP
+- **Hardware Debug Probe Support:** J-Link, ST-Link, and CMSIS-DAP
 - **probe-rs Engine:** Robust, open-source, Rust-based asynchronous flashing back-end
 - **Dual-Slot Flashing:** Coordinated sequential programming & verification for Bootloader and Application binaries
 - **Auto-Speed Fallback:** Dynamic frequency reduction when communication or verification errors occur
