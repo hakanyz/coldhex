@@ -27,7 +27,7 @@ private slots:
         in.slot2Path = "C:/fw/app.bin";
         in.slot1Address = "0x08000000";
         in.slot2Address = "0x08008000";
-        in.customChipFiles = QStringList{"C:/chips/APM32F1xx.yaml", "C:/chips/NuMicro.yaml"};
+        in.customChipFiles = QStringList{"C:/chips/APM32F1xx.yaml", "C:/chips/APM32F4.yaml"};
         in.slot1Enabled = false;
         in.slot2Enabled = true;
         in.geometry = QByteArray("\x01\x02\x03", 3);

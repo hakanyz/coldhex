@@ -1,10 +1,10 @@
 # ProbeDesk
 
-ProbeDesk is a modern, modular desktop flashing and management utility for ARM Cortex-M microcontrollers (STM32, GD32, Geehy/APM32, TI, Nuvoton, and others), independent of any single silicon vendor.
+ProbeDesk is a modern, modular desktop flashing and management utility for ARM Cortex-M microcontrollers (STM32, GD32, Geehy/APM32, TI, and others), independent of any single silicon vendor.
 
 ## Key Features
 
-- **Broad Microcontroller Ecosystem:** CMSIS-Pack powered support for Cortex-M families (STM32, GD32, Geehy, TI, Nuvoton, etc.)
+- **Broad Microcontroller Ecosystem:** CMSIS-Pack powered support for Cortex-M families (STM32, GD32, Geehy, TI, etc.)
 - **Hardware Debug Probe Support:** J-Link, ST-Link, and CMSIS-DAP
 - **probe-rs Engine:** Robust, open-source, Rust-based asynchronous flashing back-end
 - **Dual-Slot Flashing:** Coordinated sequential programming & verification for Bootloader and Application binaries
@@ -15,7 +15,7 @@ ProbeDesk is a modern, modular desktop flashing and management utility for ARM C
 
 ProbeDesk drives the [probe-rs](https://probe.rs) command line tool. Install `probe-rs` and make sure it is on `PATH` (the installer's default `~/.cargo/bin` is also searched).
 
-## Chips unknown to probe-rs (e.g. APM32, Nuvoton)
+## Chips unknown to probe-rs (e.g. APM32)
 
 probe-rs ships with its own chip database. For chips it does not know, generate a chip description from the vendor's CMSIS-Pack and add it in ProbeDesk:
 

@@ -594,7 +594,7 @@
     <string>Add Chip Description File...</string>
    </property>
    <property name="toolTip">
-    <string>Add a probe-rs chip description (YAML) for chips probe-rs does not know, e.g. APM32 or Nuvoton</string>
+    <string>Add a probe-rs chip description (YAML) for chips probe-rs does not know, e.g. APM32</string>
    </property>
   </action>
   <action name="actionClearChipFiles">
