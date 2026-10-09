@@ -39,3 +39,6 @@ Makefile
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Generated chip descriptions (see resources/chips/README.md)
+resources/chips/*.yaml

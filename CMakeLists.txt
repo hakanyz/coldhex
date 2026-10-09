@@ -31,6 +31,8 @@ set(SOURCES
     src/core/ChipCatalog.cpp
     src/engine/ChipDescription.h
     src/engine/ChipDescription.cpp
+    src/engine/BundledChips.h
+    src/engine/BundledChips.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -40,6 +42,16 @@ qt_add_executable(probedesk
     MANUAL_FINALIZATION
     ${SOURCES}
 )
+
+# Chip descriptions in resources/chips are built into the executable (see resources/chips/README.md).
+file(GLOB CHIP_YAMLS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/chips/*.yaml)
+if(CHIP_YAMLS)
+    qt_add_resources(probedesk "bundled_chips"
+        PREFIX "/chips"
+        BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/chips"
+        FILES ${CHIP_YAMLS}
+    )
+endif()
 
 target_include_directories(probedesk PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -135,4 +147,13 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_chipdescription PRIVATE src)
     target_link_libraries(tst_chipdescription PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_chipdescription COMMAND tst_chipdescription)
+
+    add_executable(tst_bundledchips
+        tests/tst_bundledchips.cpp
+        src/engine/BundledChips.cpp
+        src/engine/BundledChips.h
+    )
+    target_include_directories(tst_bundledchips PRIVATE src)
+    target_link_libraries(tst_bundledchips PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_bundledchips COMMAND tst_bundledchips)
 endif()

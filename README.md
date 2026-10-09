@@ -26,6 +26,8 @@ probe-rs ships with its own chip database. For chips it does not know, generate 
 
 The chips from that file then appear in the chip list (also under **Custom files**).
 
+To ship chips inside the executable instead, put the generated `.yaml` files in `resources/chips/` and re-run CMake; they are loaded on every start (see `resources/chips/README.md`).
+
 ## Architecture Overview
 
 ```

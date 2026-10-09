@@ -3,6 +3,8 @@
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
 #include "engine/ChipDescription.h"
+#include "engine/BundledChips.h"
+#include <QStandardPaths>
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QSettings>
@@ -235,7 +237,15 @@ void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, co
 // refreshes the manufacturer and model boxes.
 void MainWindow::rebuildChipCatalog() {
     m_chips = m_builtinChips;
+
+    // Chip descriptions built into the executable, then the ones the user added.
+    QStringList descriptionFiles = BundledChips::extract(":/chips",
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/chips");
     for (const QString& path : m_customChipFiles) {
+        if (!descriptionFiles.contains(path)) descriptionFiles << path;
+    }
+
+    for (const QString& path : descriptionFiles) {
         QString family;
         QString error;
         const QStringList names = ChipDescription::variantNamesFromFile(path, &family, &error);
@@ -244,7 +254,7 @@ void MainWindow::rebuildChipCatalog() {
             continue;
         }
         for (const QString& name : names) {
-            m_chips.append({"Custom: " + family, name, path});
+            m_chips.append({"Chip file: " + family, name, path});
         }
         appendLog("INFO", QString("Chip description '%1': %2 chips (%3).")
                               .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
