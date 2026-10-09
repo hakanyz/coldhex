@@ -41,6 +41,9 @@ public:
     explicit IProgrammerEngine(QObject* parent = nullptr) : QObject(parent) {}
     virtual ~IProgrammerEngine() = default;
 
+    // Sets chip, speed and probe used by the following commands. Switching chip or
+    // probe drops an existing connection.
+    virtual void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
     virtual bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
     virtual void disconnectTarget() = 0;
     virtual bool isConnected() const = 0;

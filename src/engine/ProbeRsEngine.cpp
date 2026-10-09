@@ -50,12 +50,23 @@ bool ProbeRsEngine::isBusy() const {
     return m_state != EngineState::Idle;
 }
 
-bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
-    if (isBusy()) return false;
+void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
+    const bool targetChanged = (chipName != m_currentChip) || (probeId != m_currentProbeId);
 
     m_currentChip = chipName;
     m_currentSpeedKhz = speedKhz;
     m_currentProbeId = probeId;
+
+    if (targetChanged && m_connected && !isBusy()) {
+        m_connected = false;
+        emit disconnected();
+    }
+}
+
+bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
+    if (isBusy()) return false;
+
+    configureTarget(chipName, speedKhz, probeId);
 
     QStringList args = {"info", "--chip", chipName};
     if (speedKhz > 0) {

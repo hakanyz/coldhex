@@ -11,6 +11,10 @@ class MockEngine : public IProgrammerEngine {
 public:
     explicit MockEngine(QObject* parent = nullptr) : IProgrammerEngine(parent) {}
 
+    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) override {
+        configured << QString("%1@%2:%3").arg(chipName).arg(speedKhz).arg(probeId);
+    }
+
     bool connectTarget(const QString&, uint32_t speedKhz, const QString&) override {
         commands << QString("connect@%1").arg(speedKhz);
         m_pendingConnect = true;
@@ -43,6 +47,7 @@ public:
     }
 
     QStringList commands;
+    QStringList configured;
     QList<ChipEntry> chips;
 
 private:

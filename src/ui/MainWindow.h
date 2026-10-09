@@ -69,6 +69,7 @@ private:
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
     bool resolveChip(QString& chip);
+    bool prepareEngine();
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;

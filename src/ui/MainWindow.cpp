@@ -242,6 +242,15 @@ void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, co
     }
 }
 
+// Pushes the chip, speed and probe currently shown in the UI to the engine, so erase, reset
+// and program never run with stale or empty settings.
+bool MainWindow::prepareEngine() {
+    QString chip;
+    if (!resolveChip(chip)) return false;
+    m_engine->configureTarget(chip, ui->spinSpeed->value(), ui->comboProbe->currentData().toString());
+    return true;
+}
+
 // Returns false (after telling the user) when the chip name is not known to probe-rs.
 bool MainWindow::resolveChip(QString& chip) {
     chip = ui->comboModel->currentText().trimmed();
@@ -329,6 +338,8 @@ void MainWindow::onEraseTriggered() {
             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
         return;
     }
+    if (!prepareEngine()) return;
+
     m_isOperationRunning = true;
     updateUiState();
     m_engine->eraseTarget(true);
@@ -362,6 +373,8 @@ void MainWindow::onProgramTriggered() {
         QMessageBox::warning(this, "Address Overlap", msg);
         return;
     }
+
+    if (!prepareEngine()) return;
 
     m_coordinator->setTargetConfig(cfg);
     m_coordinator->setSlot1(s1);
@@ -416,6 +429,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
 }
 
 void MainWindow::onResetTargetTriggered() {
+    if (!prepareEngine()) return;
     m_engine->resetTarget(false);
 }
 

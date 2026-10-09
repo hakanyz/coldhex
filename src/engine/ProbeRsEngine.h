@@ -20,6 +20,7 @@ public:
     explicit ProbeRsEngine(QObject* parent = nullptr);
     ~ProbeRsEngine() override;
 
+    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) override;
     bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) override;
     void disconnectTarget() override;
     bool isConnected() const override;
