@@ -1,15 +1,25 @@
 # ProbeDesk
 
-ProbeDesk, ARM Cortex-M tabanlı mikrodenetleyiciler (STM32, GD32, Geehy/APM32, TI, Nuvoton vb.) için geliştirilmiş, donanım ve üretici bağımsız modern masaüstü flaşlama ve yönetim aracıdır.
+ProbeDesk is a modern, modular desktop flashing and management utility for ARM Cortex-M microcontrollers (STM32, GD32, Geehy/APM32, TI, Nuvoton, and others), independent of any single silicon vendor.
 
-## Özellikler
+## Key Features
 
-- **Geniş Çip Ekosistemi:** CMSIS-Pack destekli Cortex-M aileleri (STM32, GD32, Geehy, TI, Nuvoton vb.)
-- **Donanım Köprüsü Desteği:** J-Link, RailLink ve CMSIS-DAP
-- **probe-rs Motoru:** Güçlü, bağımsız ve açık kaynaklı Rust tabanlı flaşlama altyapısı
-- **Çift Slot Flaşlama:** Bootloader ve Uygulama ikililerini tek seferde sıralı yazma ve doğrulama
-- **Otomatik Hız Yönetimi:** Kararsız bağlantılarda dinamik frekans düşürme (Auto-Speed)
-- **Modern ve Modüler Mimari:** Presentation (Qt Widgets), Core ve Engine katmanlı yapı
+- **Broad Microcontroller Ecosystem:** CMSIS-Pack powered support for Cortex-M families (STM32, GD32, Geehy, TI, Nuvoton, etc.)
+- **Hardware Debug Probe Support:** J-Link, RailLink, and CMSIS-DAP
+- **probe-rs Engine:** Robust, open-source, Rust-based asynchronous flashing back-end
+- **Dual-Slot Flashing:** Coordinated sequential programming & verification for Bootloader and Application binaries
+- **Auto-Speed Fallback:** Dynamic frequency reduction when communication or verification errors occur
+- **Layered Architecture:** Clear decoupling between Presentation (Qt Widgets), Core logic, and Engine drivers
 
-## Lisans
+## Architecture Overview
+
+```
+src/
+├── app/        # Application entry point & theme initialization
+├── ui/         # Qt Widgets GUI (MainWindow, dialogs, logging console)
+├── core/       # Flashing coordinator, state machine, HEX/BIN parsers
+└── engine/     # Programmer engine interface & probe-rs driver
+```
+
+## License
 MIT
