@@ -103,8 +103,12 @@ void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, b
     }
 
     QFileInfo fi(filePath);
-    if (fi.suffix().compare("bin", Qt::CaseInsensitive) == 0 && baseAddress != 0) {
-        args << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
+    // probe-rs only honours --base-address together with --binary-format bin.
+    if (fi.suffix().compare("bin", Qt::CaseInsensitive) == 0) {
+        args << "--binary-format" << "bin"
+             << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
+    } else if (fi.suffix().compare("hex", Qt::CaseInsensitive) == 0 || fi.suffix().compare("ihex", Qt::CaseInsensitive) == 0) {
+        args << "--binary-format" << "hex";
     }
 
     args << filePath;
