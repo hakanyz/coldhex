@@ -21,6 +21,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private slots:
     // Toolbar Actions
     void onConnectTriggered();
@@ -63,6 +66,8 @@ private:
     void appendLog(const QString& levelStr, const QString& message, const QString& colorHex = "#dcdcdc");
     void loadFileIntoSlot(int slotIndex, const QString& filePath);
     void updateMemoryViewer();
+    void restoreSettings();
+    void saveSettings();
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;

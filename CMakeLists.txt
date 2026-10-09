@@ -23,6 +23,8 @@ set(SOURCES
     src/core/HexParser.cpp
     src/core/FlashCoordinator.h
     src/core/FlashCoordinator.cpp
+    src/core/AppSettings.h
+    src/core/AppSettings.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -78,4 +80,13 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_hexparser PRIVATE src)
     target_link_libraries(tst_hexparser PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_hexparser COMMAND tst_hexparser)
+
+    add_executable(tst_appsettings
+        tests/tst_appsettings.cpp
+        src/core/AppSettings.cpp
+        src/core/AppSettings.h
+    )
+    target_include_directories(tst_appsettings PRIVATE src)
+    target_link_libraries(tst_appsettings PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_appsettings COMMAND tst_appsettings)
 endif()

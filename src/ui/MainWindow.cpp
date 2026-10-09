@@ -1,6 +1,9 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "core/HexParser.h"
+#include "core/AppSettings.h"
+#include <QCloseEvent>
+#include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
 #include <QMessageBox>
@@ -64,12 +67,61 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     onRefreshProbesTriggered();
+    restoreSettings();
     appendLog("INFO", "ProbeDesk v0.1 started.");
     updateUiState();
 }
 
 MainWindow::~MainWindow() {
     delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    saveSettings();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::restoreSettings() {
+    QSettings settings;
+    const UiSettings s = AppSettings::load(settings);
+    if (!s.hasSaved) return;
+
+    auto selectIfPresent = [](QComboBox* combo, const QString& text) {
+        int idx = combo->findText(text);
+        if (idx >= 0) combo->setCurrentIndex(idx);
+    };
+
+    selectIfPresent(ui->comboManufacturer, s.manufacturer);  // repopulates the model list
+    selectIfPresent(ui->comboModel, s.chip);
+    selectIfPresent(ui->comboProbe, s.probe);
+    selectIfPresent(ui->comboInterface, s.interfaceName);
+    ui->spinSpeed->setValue(qBound(ui->spinSpeed->minimum(), s.speedKhz, ui->spinSpeed->maximum()));
+
+    ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
+    ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
+    ui->editSlot1Path->setText(s.slot1Path);
+    ui->editSlot2Path->setText(s.slot2Path);
+
+    if (!s.geometry.isEmpty()) restoreGeometry(s.geometry);
+    if (!s.windowState.isEmpty()) restoreState(s.windowState);
+}
+
+void MainWindow::saveSettings() {
+    UiSettings s;
+    s.manufacturer = ui->comboManufacturer->currentText();
+    s.chip = ui->comboModel->currentText();
+    s.probe = ui->comboProbe->currentText();
+    s.interfaceName = ui->comboInterface->currentText();
+    s.speedKhz = ui->spinSpeed->value();
+    s.slot1Path = ui->editSlot1Path->text();
+    s.slot2Path = ui->editSlot2Path->text();
+    s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
+    s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
+    s.geometry = saveGeometry();
+    s.windowState = saveState();
+
+    QSettings settings;
+    AppSettings::save(settings, s);
 }
 
 void MainWindow::setupUiCustomizations() {
