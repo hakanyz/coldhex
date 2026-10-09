@@ -2,7 +2,6 @@
 
 #include <QMainWindow>
 #include <QComboBox>
-#include <QSlider>
 #include <QLabel>
 #include "core/FlashCoordinator.h"
 #include "core/FirmwareTarget.h"
@@ -39,8 +38,6 @@ private slots:
     // Settings Panel Controls
     void onManufacturerChanged(const QString& manufacturer);
     void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
-    void onSpeedSliderChanged(int value);
-    void onSpeedSpinChanged(int value);
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
     void onSlot1PathChanged(const QString& path);
@@ -80,8 +77,6 @@ private:
 
     // Additional toolbar widgets
     QComboBox *m_comboToolbarHexFile = nullptr;
-    QSlider *m_sliderToolbarSpeed = nullptr;
-    QLabel *m_lblToolbarSpeed = nullptr;
 
     // Cached file data for memory viewer
     HexParseResult m_slot1ParseResult;

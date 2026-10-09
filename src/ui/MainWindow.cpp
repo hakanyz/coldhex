@@ -50,7 +50,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Settings Panel Controls
     connect(ui->comboManufacturer, &QComboBox::currentTextChanged, this, &MainWindow::onManufacturerChanged);
-    connect(ui->spinSpeed, QOverload<int>::of(&QSpinBox::valueChanged), this, &MainWindow::onSpeedSpinChanged);
     connect(ui->btnOpenSlot1, &QPushButton::clicked, this, &MainWindow::onOpenSlot1Clicked);
     connect(ui->btnOpenSlot2, &QPushButton::clicked, this, &MainWindow::onOpenSlot2Clicked);
     connect(ui->editSlot1Path, &QLineEdit::textChanged, this, &MainWindow::onSlot1PathChanged);
@@ -179,21 +178,6 @@ void MainWindow::setupToolBarWidgets() {
             ui->radioSourceFile2->setChecked(true);
         }
     });
-
-    ui->mainToolBar->addSeparator();
-
-    // SWD Frequency label & slider
-    m_lblToolbarSpeed = new QLabel("  SWD Frequency (kHz): ", this);
-    ui->mainToolBar->addWidget(m_lblToolbarSpeed);
-
-    m_sliderToolbarSpeed = new QSlider(Qt::Horizontal, this);
-    m_sliderToolbarSpeed->setRange(100, 10000);
-    m_sliderToolbarSpeed->setSingleStep(500);
-    m_sliderToolbarSpeed->setValue(1000);
-    m_sliderToolbarSpeed->setMaximumWidth(140);
-    ui->mainToolBar->addWidget(m_sliderToolbarSpeed);
-
-    connect(m_sliderToolbarSpeed, &QSlider::valueChanged, this, &MainWindow::onSpeedSliderChanged);
 }
 
 void MainWindow::setupDeviceDatabase() {
@@ -276,18 +260,6 @@ bool MainWindow::resolveChip(QString& chip) {
     }
     chip = canonical;
     return true;
-}
-
-void MainWindow::onSpeedSliderChanged(int value) {
-    if (ui->spinSpeed->value() != value) {
-        ui->spinSpeed->setValue(value);
-    }
-}
-
-void MainWindow::onSpeedSpinChanged(int value) {
-    if (m_sliderToolbarSpeed && m_sliderToolbarSpeed->value() != value) {
-        m_sliderToolbarSpeed->setValue(value);
-    }
 }
 
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
