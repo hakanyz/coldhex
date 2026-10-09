@@ -123,10 +123,8 @@ void ProbeRsEngine::resetTarget(bool halt) {
 
 void ProbeRsEngine::cancelCurrentOperation() {
     if (m_process && m_process->state() != QProcess::NotRunning) {
+        m_cancelRequested = true;
         m_process->kill();
-        m_state = EngineState::Idle;
-        emit logMessage("Operation cancelled by user.", EngineLogLevel::Warning);
-        emit operationFinished(false, "Operation cancelled.");
     }
 }
 
@@ -177,6 +175,9 @@ QList<ProbeInfo> ProbeRsEngine::listAvailableProbes() {
 
 void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription) {
     m_state = targetState;
+    m_cancelRequested = false;
+    m_stdoutBuffer.clear();
+    m_stderrBuffer.clear();
     m_currentActionDescription = actionDescription;
 
     emit operationStarted(actionDescription);
@@ -185,18 +186,31 @@ void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState,
     m_process->start(m_executablePath, args);
 }
 
-void ProbeRsEngine::onProcessReadyReadStdOut() {
-    while (m_process->canReadLine()) {
-        QString line = QString::fromUtf8(m_process->readLine()).trimmed();
-        parseOutputLine(line, false);
+void ProbeRsEngine::drainOutput(QByteArray& buffer, const QByteArray& chunk, bool isError, bool flushRemainder) {
+    buffer.append(chunk);
+
+    // probe-rs rewrites progress lines using '\r', so both '\r' and '\n' end a line.
+    int start = 0;
+    for (int i = 0; i < buffer.size(); ++i) {
+        if (buffer[i] == '\r' || buffer[i] == '\n') {
+            parseOutputLine(QString::fromUtf8(buffer.mid(start, i - start)).trimmed(), isError);
+            start = i + 1;
+        }
+    }
+    buffer.remove(0, start);
+
+    if (flushRemainder && !buffer.isEmpty()) {
+        parseOutputLine(QString::fromUtf8(buffer).trimmed(), isError);
+        buffer.clear();
     }
 }
 
+void ProbeRsEngine::onProcessReadyReadStdOut() {
+    drainOutput(m_stdoutBuffer, m_process->readAllStandardOutput(), false);
+}
+
 void ProbeRsEngine::onProcessReadyReadStdErr() {
-    while (m_process->canReadLine()) {
-        QString line = QString::fromUtf8(m_process->readLine()).trimmed();
-        parseOutputLine(line, true);
-    }
+    drainOutput(m_stderrBuffer, m_process->readAllStandardError(), true);
 }
 
 void ProbeRsEngine::parseOutputLine(const QString& line, bool isError) {
@@ -219,6 +233,17 @@ void ProbeRsEngine::parseOutputLine(const QString& line, bool isError) {
 }
 
 void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    drainOutput(m_stdoutBuffer, m_process->readAllStandardOutput(), false, true);
+    drainOutput(m_stderrBuffer, m_process->readAllStandardError(), true, true);
+
+    if (m_cancelRequested) {
+        m_cancelRequested = false;
+        m_state = EngineState::Idle;
+        emit logMessage("Operation cancelled by user.", EngineLogLevel::Warning);
+        emit operationFinished(false, "Operation cancelled.");
+        return;
+    }
+
     bool success = (exitCode == 0 && exitStatus == QProcess::NormalExit);
     EngineState completedState = m_state;
     m_state = EngineState::Idle;

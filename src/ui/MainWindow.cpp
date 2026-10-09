@@ -199,7 +199,7 @@ void MainWindow::onRefreshProbesTriggered() {
         }
         appendLog("INFO", QString("Found probe: %1.").arg(probes.first().identifier));
     } else {
-        appendLog("INFO", "Found probe: RailLink (J-Link V9 Clone).");
+        appendLog("WARNING", "No debug probe detected. Check the USB connection and probe driver.");
     }
 }
 

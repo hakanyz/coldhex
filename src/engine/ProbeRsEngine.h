@@ -45,11 +45,15 @@ private slots:
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription);
     void parseOutputLine(const QString& line, bool isError);
+    void drainOutput(QByteArray& buffer, const QByteArray& chunk, bool isError, bool flushRemainder = false);
 
     QString m_executablePath = "probe-rs";
     QProcess* m_process = nullptr;
     EngineState m_state = EngineState::Idle;
     bool m_connected = false;
+    bool m_cancelRequested = false;
+    QByteArray m_stdoutBuffer;
+    QByteArray m_stderrBuffer;
 
     QString m_currentChip;
     uint32_t m_currentSpeedKhz = 4000;
