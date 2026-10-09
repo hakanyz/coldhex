@@ -100,4 +100,14 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_slotvalidator PRIVATE src)
     target_link_libraries(tst_slotvalidator PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_slotvalidator COMMAND tst_slotvalidator)
+
+    add_executable(tst_probelist
+        tests/tst_proberslist.cpp
+        src/engine/ProbeRsEngine.cpp
+        src/engine/ProbeRsEngine.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_probelist PRIVATE src)
+    target_link_libraries(tst_probelist PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_probelist COMMAND tst_probelist)
 endif()

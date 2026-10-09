@@ -1,6 +1,8 @@
 #include "ProbeRsEngine.h"
 #include <QDebug>
 #include <QFileInfo>
+#include <QDir>
+#include <QStandardPaths>
 
 ProbeRsEngine::ProbeRsEngine(QObject* parent)
     : IProgrammerEngine(parent),
@@ -12,6 +14,12 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProbeRsEngine::onProcessFinished);
     connect(m_process, &QProcess::errorOccurred, this, &ProbeRsEngine::onProcessErrorOccurred);
+
+    // The probe-rs installer puts the binary in ~/.cargo/bin, which is not always on PATH.
+    if (QStandardPaths::findExecutable("probe-rs").isEmpty()) {
+        const QString fallback = QStandardPaths::findExecutable("probe-rs", {QDir::homePath() + "/.cargo/bin"});
+        if (!fallback.isEmpty()) m_executablePath = fallback;
+    }
 }
 
 ProbeRsEngine::~ProbeRsEngine() {
@@ -149,28 +157,42 @@ QStringList ProbeRsEngine::listSupportedChips(const QString& filter) {
     return results;
 }
 
-QList<ProbeInfo> ProbeRsEngine::listAvailableProbes() {
-    QProcess proc;
-    QStringList args = {"list"};
-    proc.start(m_executablePath, args);
-    if (!proc.waitForFinished(5000)) {
-        return {};
-    }
+QList<ProbeInfo> ProbeRsEngine::parseProbeList(const QString& output) {
+    // Example line: "[0]: STLink V2 -- 0483:3748: (ST-LINK)"; the serial number may follow the PID.
+    static const QRegularExpression lineRegex(
+        QStringLiteral(R"(^\[\d+\]:\s*(.+?)\s+--\s+([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})(?::([^\s:]*))?)"));
 
-    QString output = QString::fromUtf8(proc.readAllStandardOutput());
-    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
     QList<ProbeInfo> probes;
-
+    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
     for (const QString& line : lines) {
-        QString trimmed = line.trimmed();
-        if (trimmed.isEmpty() || trimmed.startsWith("Probes:") || trimmed.startsWith("No probes found")) {
-            continue;
-        }
+        const QRegularExpressionMatch m = lineRegex.match(line.trimmed());
+        if (!m.hasMatch()) continue;
+
         ProbeInfo info;
-        info.identifier = trimmed;
+        info.identifier = line.trimmed();
+        info.displayName = m.captured(1).trimmed();
+        info.vendorId = m.captured(2).toUpper();
+        info.productId = m.captured(3).toUpper();
+        info.serialNumber = m.captured(4);
         probes.append(info);
     }
     return probes;
+}
+
+QList<ProbeInfo> ProbeRsEngine::listAvailableProbes() {
+    QProcess proc;
+    proc.start(m_executablePath, {"list"});
+    if (!proc.waitForStarted(3000)) {
+        emit logMessage(QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath),
+                        EngineLogLevel::Error);
+        return {};
+    }
+    if (!proc.waitForFinished(5000)) {
+        proc.kill();
+        return {};
+    }
+
+    return parseProbeList(QString::fromUtf8(proc.readAllStandardOutput()));
 }
 
 void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription) {

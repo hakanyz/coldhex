@@ -193,9 +193,6 @@ void MainWindow::setupDeviceDatabase() {
     ui->comboManufacturer->addItems({"STM32", "GD32", "APM32 / Geehy", "TI", "Nuvoton"});
     ui->comboManufacturer->setCurrentText("STM32");
 
-    // Probes
-    ui->comboProbe->addItems({"J-Link", "ST-Link", "CMSIS-DAP"});
-
     // Interfaces
     ui->comboInterface->addItems({"SWD", "JTAG"});
     ui->comboInterface->setCurrentText("SWD");
@@ -251,22 +248,38 @@ void MainWindow::updateUiState() {
 }
 
 void MainWindow::onRefreshProbesTriggered() {
-    auto probes = m_engine->listAvailableProbes();
-    if (!probes.isEmpty()) {
-        ui->comboProbe->clear();
-        for (const auto& p : probes) {
-            ui->comboProbe->addItem(p.identifier);
-        }
-        appendLog("INFO", QString("Found probe: %1.").arg(probes.first().identifier));
-    } else {
-        appendLog("WARNING", "No debug probe detected. Check the USB connection and probe driver.");
+    const QString previous = ui->comboProbe->currentText();
+    const auto probes = m_engine->listAvailableProbes();
+
+    ui->comboProbe->clear();
+    if (probes.isEmpty()) {
+        // Empty data means "let probe-rs pick"; connecting will report the real error.
+        ui->comboProbe->addItem("(no probe detected)", QString());
+        appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
+        return;
+    }
+
+    for (const auto& p : probes) {
+        const QString label = p.displayName + " [" + p.selector() + "]";
+        ui->comboProbe->addItem(label, p.selector());
+        appendLog("INFO", QString("Found probe: %1").arg(label));
+    }
+    int idx = ui->comboProbe->findText(previous);
+    if (idx >= 0) ui->comboProbe->setCurrentIndex(idx);
+
+    if (probes.size() > 1) {
+        const QString msg = QString("%1 probes found. Using: %2. Check the Probe selection before flashing.")
+                                .arg(probes.size())
+                                .arg(ui->comboProbe->currentText());
+        appendLog("WARNING", msg, "#ffb86c");
+        ui->statusBar->showMessage(msg, 8000);
     }
 }
 
 void MainWindow::onConnectTriggered() {
     QString chip = ui->comboModel->currentText().trimmed();
     uint32_t speed = ui->spinSpeed->value();
-    QString probe = ui->comboProbe->currentText();
+    QString probe = ui->comboProbe->currentData().toString();
 
     m_isOperationRunning = true;
     updateUiState();

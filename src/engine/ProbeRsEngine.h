@@ -33,6 +33,9 @@ public:
     QStringList listSupportedChips(const QString& filter = QString()) override;
     QList<ProbeInfo> listAvailableProbes() override;
 
+    // Parses the output of "probe-rs list".
+    static QList<ProbeInfo> parseProbeList(const QString& output);
+
     void setExecutablePath(const QString& path);
     QString executablePath() const;
 

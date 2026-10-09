@@ -14,10 +14,18 @@ enum class EngineLogLevel {
 };
 
 struct ProbeInfo {
-    QString identifier;
+    QString identifier;   // raw line from the engine
+    QString displayName;  // e.g. "STLink V2"
     QString vendorId;
     QString productId;
     QString serialNumber;
+
+    // Value accepted by probe-rs --probe: VID:PID or VID:PID:Serial.
+    QString selector() const {
+        QString s = vendorId + ":" + productId;
+        if (!serialNumber.isEmpty()) s += ":" + serialNumber;
+        return s;
+    }
 };
 
 class IProgrammerEngine : public QObject {
