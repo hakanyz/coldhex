@@ -388,6 +388,19 @@
            </widget>
           </item>
           <item>
+           <widget class="QLineEdit" name="editSlot1Address">
+            <property name="text">
+             <string>0x08000000</string>
+            </property>
+            <property name="toolTip">
+             <string>Start address (used for .bin files; HEX files carry their own addresses)</string>
+            </property>
+            <property name="maximumWidth">
+             <number>90</number>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="checkSlot1Enabled">
             <property name="text">
              <string/>
@@ -422,6 +435,19 @@
            <widget class="QLineEdit" name="editSlot2Path">
             <property name="placeholderText">
              <string>Select application file...</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="editSlot2Address">
+            <property name="text">
+             <string>0x08008000</string>
+            </property>
+            <property name="toolTip">
+             <string>Start address (used for .bin files; HEX files carry their own addresses)</string>
+            </property>
+            <property name="maximumWidth">
+             <number>90</number>
             </property>
            </widget>
           </item>

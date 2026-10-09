@@ -56,6 +56,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->editSlot1Path, &QLineEdit::textChanged, this, &MainWindow::onSlot1PathChanged);
     connect(ui->editSlot2Path, &QLineEdit::textChanged, this, &MainWindow::onSlot2PathChanged);
 
+    // Start address edits re-base binary files in the memory viewer
+    connect(ui->editSlot1Address, &QLineEdit::editingFinished, this, [this]() { loadFileIntoSlot(1, ui->editSlot1Path->text()); });
+    connect(ui->editSlot2Address, &QLineEdit::editingFinished, this, [this]() { loadFileIntoSlot(2, ui->editSlot2Path->text()); });
+
     // Data Source Radios
     connect(ui->radioSourceFile1, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
     connect(ui->radioSourceFile2, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
@@ -100,6 +104,8 @@ void MainWindow::restoreSettings() {
     ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
     ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
     ui->editSlot1Path->setText(s.slot1Path);
+    if (!s.slot1Address.isEmpty()) ui->editSlot1Address->setText(s.slot1Address);
+    if (!s.slot2Address.isEmpty()) ui->editSlot2Address->setText(s.slot2Address);
     ui->editSlot2Path->setText(s.slot2Path);
 
     if (!s.geometry.isEmpty()) restoreGeometry(s.geometry);
@@ -115,6 +121,8 @@ void MainWindow::saveSettings() {
     s.speedKhz = ui->spinSpeed->value();
     s.slot1Path = ui->editSlot1Path->text();
     s.slot2Path = ui->editSlot2Path->text();
+    s.slot1Address = ui->editSlot1Address->text();
+    s.slot2Address = ui->editSlot2Address->text();
     s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
     s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
     s.geometry = saveGeometry();
@@ -304,20 +312,75 @@ void MainWindow::onProgramTriggered() {
     cfg.resetAfterFlash = true;
 
     FirmwareSlot s1;
-    s1.enabled = ui->checkSlot1Enabled->isChecked() && !ui->editSlot1Path->text().isEmpty();
-    s1.label = "Slot 1 (Bootloader)";
-    s1.filePath = ui->editSlot1Path->text().trimmed();
-
     FirmwareSlot s2;
-    s2.enabled = ui->checkSlot2Enabled->isChecked() && !ui->editSlot2Path->text().isEmpty();
-    s2.label = "Slot 2 (Application)";
-    s2.filePath = ui->editSlot2Path->text().trimmed();
+    AddressRange range1;
+    AddressRange range2;
+    if (!buildSlot(1, s1, range1) || !buildSlot(2, s2, range2)) {
+        return;
+    }
+
+    if (s1.enabled && s2.enabled && SlotValidator::overlaps(range1, range2)) {
+        const QString msg = QString("Slot 1 (0x%1 - 0x%2) and Slot 2 (0x%3 - 0x%4) overlap. "
+                                    "Flashing would overwrite the bootloader.")
+                                .arg(range1.start, 8, 16, QLatin1Char('0'))
+                                .arg(uint64_t(range1.start) + range1.size - 1, 8, 16, QLatin1Char('0'))
+                                .arg(range2.start, 8, 16, QLatin1Char('0'))
+                                .arg(uint64_t(range2.start) + range2.size - 1, 8, 16, QLatin1Char('0'));
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Address Overlap", msg);
+        return;
+    }
 
     m_coordinator->setTargetConfig(cfg);
     m_coordinator->setSlot1(s1);
     m_coordinator->setSlot2(s2);
 
     m_coordinator->startFlashSequence();
+}
+
+bool MainWindow::slotAddress(int slotIndex, uint32_t& address) const {
+    QLineEdit* edit = (slotIndex == 1) ? ui->editSlot1Address : ui->editSlot2Address;
+    return SlotValidator::parseAddress(edit->text(), address);
+}
+
+// Fills `slot` and `range` from the UI. Returns false (after telling the user why)
+// when an enabled slot has an unreadable file or an invalid address.
+bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range) {
+    const bool first = (slotIndex == 1);
+    const QString path = (first ? ui->editSlot1Path : ui->editSlot2Path)->text().trimmed();
+    const bool checked = (first ? ui->checkSlot1Enabled : ui->checkSlot2Enabled)->isChecked();
+
+    slot.label = first ? "Slot 1 (Bootloader)" : "Slot 2 (Application)";
+    slot.filePath = path;
+    slot.enabled = checked && !path.isEmpty();
+    if (!slot.enabled) return true;
+
+    uint32_t address = 0;
+    if (!slotAddress(slotIndex, address)) {
+        const QString msg = QString("%1: invalid start address.").arg(slot.label);
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Invalid Address", msg);
+        return false;
+    }
+
+    HexParseResult res;
+    if (HexParser::detectFormat(path) == FileFormat::IntelHex) {
+        res = HexParser::analyzeHexFile(path, false);
+        address = res.baseAddress;  // HEX records carry their own addresses
+    } else {
+        res = HexParser::analyzeBinFile(path, address);
+    }
+    if (!res.success) {
+        const QString msg = QString("%1: %2").arg(slot.label, res.errorMessage);
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Invalid Firmware File", msg);
+        return false;
+    }
+
+    slot.startAddress = address;
+    range.start = address;
+    range.size = res.size;
+    return true;
 }
 
 void MainWindow::onVerifyTriggered() {
@@ -370,7 +433,13 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
     if (fmt == FileFormat::IntelHex) {
         res = HexParser::analyzeHexFile(path, true);
     } else {
-        res = HexParser::analyzeBinFile(path, 0x08000000);
+        uint32_t base = 0x08000000;
+        slotAddress(slotIndex, base);
+        res = HexParser::analyzeBinFile(path, base);
+    }
+
+    if (!res.success) {
+        appendLog("ERROR", QString("Cannot load '%1': %2").arg(fi.fileName(), res.errorMessage), "#ff5555");
     }
 
     if (slotIndex == 1) {
@@ -392,7 +461,9 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
         }
     }
 
-    appendLog("INFO", QString("HEX file '%1' loaded.").arg(fi.fileName()));
+    if (res.success) {
+        appendLog("INFO", QString("File '%1' loaded.").arg(fi.fileName()));
+    }
     updateMemoryViewer();
 }
 

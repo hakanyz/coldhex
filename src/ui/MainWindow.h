@@ -7,6 +7,7 @@
 #include "core/FlashCoordinator.h"
 #include "core/FirmwareTarget.h"
 #include "core/HexParser.h"
+#include "core/SlotValidator.h"
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
 
@@ -68,6 +69,8 @@ private:
     void updateMemoryViewer();
     void restoreSettings();
     void saveSettings();
+    bool slotAddress(int slotIndex, uint32_t& address) const;
+    bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;

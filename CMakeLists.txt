@@ -25,6 +25,8 @@ set(SOURCES
     src/core/FlashCoordinator.cpp
     src/core/AppSettings.h
     src/core/AppSettings.cpp
+    src/core/SlotValidator.h
+    src/core/SlotValidator.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -89,4 +91,13 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_appsettings PRIVATE src)
     target_link_libraries(tst_appsettings PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_appsettings COMMAND tst_appsettings)
+
+    add_executable(tst_slotvalidator
+        tests/tst_slotvalidator.cpp
+        src/core/SlotValidator.cpp
+        src/core/SlotValidator.h
+    )
+    target_include_directories(tst_slotvalidator PRIVATE src)
+    target_link_libraries(tst_slotvalidator PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_slotvalidator COMMAND tst_slotvalidator)
 endif()

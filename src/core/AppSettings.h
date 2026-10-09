@@ -18,6 +18,8 @@ struct UiSettings {
 
     QString slot1Path;
     QString slot2Path;
+    QString slot1Address;
+    QString slot2Address;
     bool slot1Enabled = true;
     bool slot2Enabled = true;
 

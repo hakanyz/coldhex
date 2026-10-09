@@ -20,6 +20,8 @@ UiSettings AppSettings::load(QSettings& settings) {
 
     v.slot1Path = settings.value("firmware/slot1Path").toString();
     v.slot2Path = settings.value("firmware/slot2Path").toString();
+    v.slot1Address = settings.value("firmware/slot1Address").toString();
+    v.slot2Address = settings.value("firmware/slot2Address").toString();
     v.slot1Enabled = settings.value("firmware/slot1Enabled", v.slot1Enabled).toBool();
     v.slot2Enabled = settings.value("firmware/slot2Enabled", v.slot2Enabled).toBool();
 
@@ -39,6 +41,8 @@ void AppSettings::save(QSettings& settings, const UiSettings& v) {
 
     settings.setValue("firmware/slot1Path", v.slot1Path);
     settings.setValue("firmware/slot2Path", v.slot2Path);
+    settings.setValue("firmware/slot1Address", v.slot1Address);
+    settings.setValue("firmware/slot2Address", v.slot2Address);
     settings.setValue("firmware/slot1Enabled", v.slot1Enabled);
     settings.setValue("firmware/slot2Enabled", v.slot2Enabled);
 
