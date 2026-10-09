@@ -29,7 +29,7 @@ public:
     void resetTarget(bool) override { commands << "reset"; m_busy = true; }
     void cancelCurrentOperation() override { commands << "cancel"; m_busy = false; }
 
-    QStringList listSupportedChips(const QString&) override { return {}; }
+    void requestChipList() override { emit chipListReady(true, chips, QString()); }
     QList<ProbeInfo> listAvailableProbes() override { return {}; }
 
     // Completes the command that is currently running.
@@ -43,6 +43,7 @@ public:
     }
 
     QStringList commands;
+    QList<ChipEntry> chips;
 
 private:
     bool m_connected = false;

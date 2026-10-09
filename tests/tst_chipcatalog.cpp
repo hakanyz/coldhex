@@ -1,0 +1,65 @@
+#include "core/ChipCatalog.h"
+#include "engine/ProbeRsEngine.h"
+#include <QtTest>
+
+class TestChipCatalog : public QObject {
+    Q_OBJECT
+
+private:
+    static QList<ChipEntry> sample() {
+        return ProbeRsEngine::parseChipList(
+            "Available chips:\r\n"
+            "GD32F30x Series\r\n"
+            "    Variants:\r\n"
+            "        GD32F303CG\r\n"
+            "        GD32F303RC\r\n"
+            "STM32F4 Series\r\n"
+            "    Variants:\r\n"
+            "        STM32F401RE\r\n"
+            "        STM32F407VG\r\n"
+            "MSPM0C Series\r\n"
+            "    Variants:\r\n"
+            "        MSPM0C1104\r\n");
+    }
+
+private slots:
+    void parsesFamiliesAndVariants() {
+        const auto chips = sample();
+        QCOMPARE(chips.size(), 5);
+        QCOMPARE(chips[0].family, QString("GD32F30x Series"));
+        QCOMPARE(chips[0].name, QString("GD32F303CG"));
+        QCOMPARE(chips[3].name, QString("STM32F407VG"));
+        QCOMPARE(chips[3].family, QString("STM32F4 Series"));
+    }
+
+    void parseIgnoresHeaderAndVariantsLines() {
+        const auto chips = ProbeRsEngine::parseChipList("Available chips:\n    Variants:\n");
+        QVERIFY(chips.isEmpty());
+        QVERIFY(ProbeRsEngine::parseChipList("").isEmpty());
+    }
+
+    void listsOnlyManufacturersThatHaveChips() {
+        const QStringList m = ChipCatalog::manufacturers(sample());
+        QCOMPARE(m, (QStringList{"All chips", "STM32", "GD32", "TI"}));
+        QVERIFY(!m.contains("APM32 / Geehy"));
+    }
+
+    void filtersChipsByManufacturer() {
+        const auto chips = sample();
+        QCOMPARE(ChipCatalog::chipNames(chips, "GD32"), (QStringList{"GD32F303CG", "GD32F303RC"}));
+        QCOMPARE(ChipCatalog::chipNames(chips, "All chips").size(), 5);
+        QVERIFY(ChipCatalog::chipNames(chips, "Unknown").isEmpty());
+    }
+
+    void findsChipCaseInsensitively() {
+        const auto chips = sample();
+        QString canonical;
+        QVERIFY(ChipCatalog::find(chips, " stm32f407vg ", &canonical));
+        QCOMPARE(canonical, QString("STM32F407VG"));
+        QVERIFY(!ChipCatalog::find(chips, "STM32F407VGT6"));
+        QVERIFY(!ChipCatalog::find(chips, ""));
+    }
+};
+
+QTEST_GUILESS_MAIN(TestChipCatalog)
+#include "tst_chipcatalog.moc"

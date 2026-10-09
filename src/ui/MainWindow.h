@@ -8,6 +8,7 @@
 #include "core/FirmwareTarget.h"
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
+#include "core/ChipCatalog.h"
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
 
@@ -29,16 +30,15 @@ private slots:
     // Toolbar Actions
     void onConnectTriggered();
     void onDisconnectTriggered();
-    void onReadTargetTriggered();
     void onEraseTriggered();
     void onProgramTriggered();
-    void onVerifyTriggered();
     void onResetTargetTriggered();
     void onOpenHexTriggered();
     void onRefreshProbesTriggered();
 
     // Settings Panel Controls
     void onManufacturerChanged(const QString& manufacturer);
+    void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
     void onSpeedSliderChanged(int value);
     void onSpeedSpinChanged(int value);
     void onOpenSlot1Clicked();
@@ -71,6 +71,7 @@ private:
     void saveSettings();
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
+    bool resolveChip(QString& chip);
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;
@@ -87,6 +88,10 @@ private:
     HexParseResult m_slot2ParseResult;
     QByteArray m_targetReadData;
     uint32_t m_targetReadBaseAddress = 0x08000000;
+
+    QList<ChipEntry> m_chips;
+    QString m_pendingManufacturer;  // restored from settings, applied once the chip list arrives
+    QString m_pendingChip;
 
     bool m_isOperationRunning = false;
 };

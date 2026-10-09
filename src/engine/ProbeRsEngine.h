@@ -30,11 +30,14 @@ public:
     void resetTarget(bool halt = false) override;
     void cancelCurrentOperation() override;
 
-    QStringList listSupportedChips(const QString& filter = QString()) override;
+    void requestChipList() override;
     QList<ProbeInfo> listAvailableProbes() override;
 
     // Parses the output of "probe-rs list".
     static QList<ProbeInfo> parseProbeList(const QString& output);
+
+    // Parses the output of "probe-rs chip list".
+    static QList<ChipEntry> parseChipList(const QString& output);
 
     void setExecutablePath(const QString& path);
     QString executablePath() const;
@@ -44,6 +47,8 @@ private slots:
     void onProcessReadyReadStdErr();
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessErrorOccurred(QProcess::ProcessError error);
+    void onChipListFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onChipListErrorOccurred(QProcess::ProcessError error);
 
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription);
@@ -52,6 +57,7 @@ private:
 
     QString m_executablePath = "probe-rs";
     QProcess* m_process = nullptr;
+    QProcess* m_chipListProcess = nullptr;
     EngineState m_state = EngineState::Idle;
     bool m_connected = false;
     bool m_cancelRequested = false;

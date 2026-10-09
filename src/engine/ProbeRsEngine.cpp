@@ -7,6 +7,7 @@
 ProbeRsEngine::ProbeRsEngine(QObject* parent)
     : IProgrammerEngine(parent),
       m_process(new QProcess(this)),
+      m_chipListProcess(new QProcess(this)),
       m_progressRegex(QStringLiteral(R"((\d+)\s*%)"))
 {
     connect(m_process, &QProcess::readyReadStandardOutput, this, &ProbeRsEngine::onProcessReadyReadStdOut);
@@ -14,6 +15,10 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProbeRsEngine::onProcessFinished);
     connect(m_process, &QProcess::errorOccurred, this, &ProbeRsEngine::onProcessErrorOccurred);
+
+    connect(m_chipListProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &ProbeRsEngine::onChipListFinished);
+    connect(m_chipListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onChipListErrorOccurred);
 
     // The probe-rs installer puts the binary in ~/.cargo/bin, which is not always on PATH.
     if (QStandardPaths::findExecutable("probe-rs").isEmpty()) {
@@ -140,25 +145,30 @@ void ProbeRsEngine::cancelCurrentOperation() {
     }
 }
 
-QStringList ProbeRsEngine::listSupportedChips(const QString& filter) {
-    QProcess proc;
-    QStringList args = {"chip", "list"};
-    proc.start(m_executablePath, args);
-    if (!proc.waitForFinished(5000)) {
-        return {};
-    }
+void ProbeRsEngine::requestChipList() {
+    if (m_chipListProcess->state() != QProcess::NotRunning) return;
+    m_chipListProcess->start(m_executablePath, {"chip", "list"});
+}
 
-    QString output = QString::fromUtf8(proc.readAllStandardOutput());
-    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-    QStringList results;
+QList<ChipEntry> ProbeRsEngine::parseChipList(const QString& output) {
+    // Family lines start at column 0, "Variants:" is indented by 4, chip names by 8.
+    QList<ChipEntry> chips;
+    QString family;
+    const QStringList lines = output.split('\n');
+    for (const QString& rawLine : lines) {
+        const QString line = QString(rawLine).remove('\r');
+        if (line.trimmed().isEmpty()) continue;
 
-    for (const QString& line : lines) {
-        QString trimmed = line.trimmed();
-        if (filter.isEmpty() || trimmed.contains(filter, Qt::CaseInsensitive)) {
-            results << trimmed;
+        int indent = 0;
+        while (indent < line.size() && line[indent] == ' ') ++indent;
+
+        if (indent == 0) {
+            if (!line.startsWith("Available chips")) family = line.trimmed();
+        } else if (indent >= 8) {
+            chips.append({family, line.trimmed()});
         }
     }
-    return results;
+    return chips;
 }
 
 QList<ProbeInfo> ProbeRsEngine::parseProbeList(const QString& output) {
@@ -293,5 +303,27 @@ void ProbeRsEngine::onProcessErrorOccurred(QProcess::ProcessError error) {
         emit logMessage(msg, EngineLogLevel::Error);
         m_state = EngineState::Idle;
         emit operationFinished(false, msg);
+    }
+}
+
+void ProbeRsEngine::onChipListFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    const QString output = QString::fromUtf8(m_chipListProcess->readAllStandardOutput());
+    if (exitCode != 0 || exitStatus != QProcess::NormalExit) {
+        emit chipListReady(false, {}, QString("'probe-rs chip list' failed (exit code %1).").arg(exitCode));
+        return;
+    }
+
+    const QList<ChipEntry> chips = parseChipList(output);
+    if (chips.isEmpty()) {
+        emit chipListReady(false, {}, "'probe-rs chip list' returned no chips.");
+        return;
+    }
+    emit chipListReady(true, chips, QString());
+}
+
+void ProbeRsEngine::onChipListErrorOccurred(QProcess::ProcessError error) {
+    if (error == QProcess::FailedToStart) {
+        emit chipListReady(false, {},
+                           QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath));
     }
 }

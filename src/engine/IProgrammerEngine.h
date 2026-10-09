@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QList>
 #include <cstdint>
 
 enum class EngineLogLevel {
@@ -11,6 +12,11 @@ enum class EngineLogLevel {
     Warning,
     Error,
     Success
+};
+
+struct ChipEntry {
+    QString family;  // e.g. "STM32F4 Series"
+    QString name;    // name accepted by --chip, e.g. "STM32F407VG"
 };
 
 struct ProbeInfo {
@@ -45,7 +51,8 @@ public:
     virtual void resetTarget(bool halt = false) = 0;
     virtual void cancelCurrentOperation() = 0;
 
-    virtual QStringList listSupportedChips(const QString& filter = QString()) = 0;
+    // Asynchronous: the result arrives through chipListReady().
+    virtual void requestChipList() = 0;
     virtual QList<ProbeInfo> listAvailableProbes() = 0;
 
 signals:
@@ -55,4 +62,5 @@ signals:
     void progressChanged(int percentage, const QString& statusText);
     void logMessage(const QString& message, EngineLogLevel level);
     void operationFinished(bool success, const QString& message);
+    void chipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
 };

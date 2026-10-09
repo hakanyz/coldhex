@@ -3,6 +3,7 @@
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
 #include <QCloseEvent>
+#include <QCompleter>
 #include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
@@ -27,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
+    connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
 
     // Coordinator Signals
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);
@@ -38,10 +40,8 @@ MainWindow::MainWindow(QWidget *parent)
     // Toolbar Actions
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::onConnectTriggered);
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
-    connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
-    connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
     connect(ui->actionResetTarget, &QAction::triggered, this, &MainWindow::onResetTargetTriggered);
     connect(ui->actionOpenHex, &QAction::triggered, this, &MainWindow::onOpenHexTriggered);
     connect(ui->actionClearLog, &QAction::triggered, ui->textLog, &QPlainTextEdit::clear);
@@ -72,6 +72,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     onRefreshProbesTriggered();
     restoreSettings();
+    m_engine->requestChipList();
     appendLog("INFO", "ProbeDesk v0.1 started.");
     updateUiState();
 }
@@ -95,8 +96,9 @@ void MainWindow::restoreSettings() {
         if (idx >= 0) combo->setCurrentIndex(idx);
     };
 
-    selectIfPresent(ui->comboManufacturer, s.manufacturer);  // repopulates the model list
-    selectIfPresent(ui->comboModel, s.chip);
+    m_pendingManufacturer = s.manufacturer;
+    m_pendingChip = s.chip;
+    ui->comboModel->setEditText(s.chip);
     selectIfPresent(ui->comboProbe, s.probe);
     selectIfPresent(ui->comboInterface, s.interfaceName);
     ui->spinSpeed->setValue(qBound(ui->spinSpeed->minimum(), s.speedKhz, ui->spinSpeed->maximum()));
@@ -152,6 +154,12 @@ void MainWindow::setupUiCustomizations() {
     ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
+    // Not implemented yet: keep them disabled instead of faking a result.
+    ui->actionRead->setEnabled(false);
+    ui->actionRead->setToolTip("Read target memory - not implemented yet");
+    ui->actionVerify->setEnabled(false);
+    ui->actionVerify->setToolTip("Verify against file - not implemented yet (Program already verifies)");
+
     ui->statusBar->showMessage("Ready");
 }
 
@@ -189,32 +197,85 @@ void MainWindow::setupToolBarWidgets() {
 }
 
 void MainWindow::setupDeviceDatabase() {
-    // Manufacturers
-    ui->comboManufacturer->addItems({"STM32", "GD32", "APM32 / Geehy", "TI", "Nuvoton"});
-    ui->comboManufacturer->setCurrentText("STM32");
+    // The chip list comes from the engine (see onChipListReady); until then the
+    // chip box stays a free-text field so a saved chip name is still usable.
+    ui->comboModel->setEditable(true);
+    ui->comboModel->setInsertPolicy(QComboBox::NoInsert);
+    if (QCompleter* completer = ui->comboModel->completer()) {
+        completer->setFilterMode(Qt::MatchContains);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+    }
 
     // Interfaces
     ui->comboInterface->addItems({"SWD", "JTAG"});
     ui->comboInterface->setCurrentText("SWD");
-
-    // Default model trigger
-    onManufacturerChanged("STM32");
 }
 
 void MainWindow::onManufacturerChanged(const QString& manufacturer) {
+    if (m_chips.isEmpty() || manufacturer.isEmpty()) return;
+
+    const QString current = ui->comboModel->currentText();
     ui->comboModel->clear();
-    if (manufacturer == "STM32") {
-        ui->comboModel->addItems({"STM32F407VGT6", "STM32F401RETx", "STM32F103C8", "STM32G474RETx", "STM32H743ZITx"});
-        ui->comboModel->setCurrentText("STM32F407VGT6");
-    } else if (manufacturer == "GD32") {
-        ui->comboModel->addItems({"GD32F303CG", "GD32F103C8", "GD32E103TB"});
-    } else if (manufacturer.contains("APM32")) {
-        ui->comboModel->addItems({"APM32F103CB", "APM32F407VG"});
-    } else if (manufacturer == "TI") {
-        ui->comboModel->addItems({"MSP432P401R", "CC2652R"});
-    } else if (manufacturer == "Nuvoton") {
-        ui->comboModel->addItems({"M487JIDAE", "NUC126NE4AE"});
+    ui->comboModel->addItems(ChipCatalog::chipNames(m_chips, manufacturer));
+
+    // Keep the typed/selected chip if it belongs to this manufacturer, otherwise start empty.
+    int idx = ui->comboModel->findText(current, Qt::MatchFixedString);
+    if (idx >= 0) {
+        ui->comboModel->setCurrentIndex(idx);
+    } else {
+        ui->comboModel->setCurrentIndex(-1);
+        ui->comboModel->clearEditText();
     }
+}
+
+void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error) {
+    if (!success) {
+        appendLog("ERROR", QString("Chip list unavailable: %1").arg(error), "#ff5555");
+        appendLog("WARNING", "Chip names cannot be checked; type the exact probe-rs chip name.");
+        ui->comboModel->setEditText(m_pendingChip);
+        return;
+    }
+
+    m_chips = chips;
+    appendLog("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
+
+    const QStringList makers = ChipCatalog::manufacturers(m_chips);
+    ui->comboManufacturer->blockSignals(true);
+    ui->comboManufacturer->clear();
+    ui->comboManufacturer->addItems(makers);
+    int makerIdx = ui->comboManufacturer->findText(m_pendingManufacturer);
+    if (makerIdx < 0) makerIdx = ui->comboManufacturer->findText("STM32");
+    ui->comboManufacturer->setCurrentIndex(makerIdx >= 0 ? makerIdx : 0);
+    ui->comboManufacturer->blockSignals(false);
+
+    ui->comboModel->setEditText(m_pendingChip);
+    onManufacturerChanged(ui->comboManufacturer->currentText());
+
+    QString canonical;
+    if (!m_pendingChip.isEmpty() && ChipCatalog::find(m_chips, m_pendingChip, &canonical)) {
+        ui->comboModel->setEditText(canonical);
+    }
+}
+
+// Returns false (after telling the user) when the chip name is not known to probe-rs.
+bool MainWindow::resolveChip(QString& chip) {
+    chip = ui->comboModel->currentText().trimmed();
+    if (chip.isEmpty()) {
+        QMessageBox::warning(this, "No Chip Selected", "Please select or type a target chip.");
+        return false;
+    }
+    if (m_chips.isEmpty()) return true;  // list unavailable; let probe-rs judge
+
+    QString canonical;
+    if (!ChipCatalog::find(m_chips, chip, &canonical)) {
+        const QString msg = QString("'%1' is not a chip name known to probe-rs. Pick one from the list.").arg(chip);
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Unknown Chip", msg);
+        return false;
+    }
+    chip = canonical;
+    return true;
 }
 
 void MainWindow::onSpeedSliderChanged(int value) {
@@ -240,10 +301,8 @@ void MainWindow::updateUiState() {
     bool busy = m_isOperationRunning || m_engine->isBusy();
     ui->actionConnect->setEnabled(!busy && !m_engine->isConnected());
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
-    ui->actionRead->setEnabled(!busy && m_engine->isConnected());
     ui->actionErase->setEnabled(!busy);
     ui->actionProgram->setEnabled(!busy);
-    ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
 }
 
@@ -277,7 +336,8 @@ void MainWindow::onRefreshProbesTriggered() {
 }
 
 void MainWindow::onConnectTriggered() {
-    QString chip = ui->comboModel->currentText().trimmed();
+    QString chip;
+    if (!resolveChip(chip)) return;
     uint32_t speed = ui->spinSpeed->value();
     QString probe = ui->comboProbe->currentData().toString();
 
@@ -289,19 +349,6 @@ void MainWindow::onConnectTriggered() {
 
 void MainWindow::onDisconnectTriggered() {
     m_engine->disconnectTarget();
-}
-
-void MainWindow::onReadTargetTriggered() {
-    appendLog("INFO", "Reading memory from target...");
-    // Mock read 256 bytes for memory viewer
-    m_targetReadData = QByteArray(512, 0);
-    for (int i = 0; i < m_targetReadData.size(); ++i) {
-        m_targetReadData[i] = static_cast<char>((i * 17 + 0x33) & 0xFF);
-    }
-    m_targetReadBaseAddress = 0x08000000;
-    ui->radioSourceTarget->setChecked(true);
-    updateMemoryViewer();
-    appendLog("INFO", "Read 512 bytes from target at 0x08000000 complete.");
 }
 
 void MainWindow::onEraseTriggered() {
@@ -317,7 +364,7 @@ void MainWindow::onEraseTriggered() {
 
 void MainWindow::onProgramTriggered() {
     TargetConfig cfg;
-    cfg.chipName = ui->comboModel->currentText().trimmed();
+    if (!resolveChip(cfg.chipName)) return;
     cfg.speedKhz = ui->spinSpeed->value();
     cfg.autoSpeedEnabled = true;
     cfg.eraseBeforeFlash = true;
@@ -394,11 +441,6 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
     range.start = address;
     range.size = res.size;
     return true;
-}
-
-void MainWindow::onVerifyTriggered() {
-    appendLog("INFO", "Verification starting...");
-    m_engine->resetTarget(false);
 }
 
 void MainWindow::onResetTargetTriggered() {
