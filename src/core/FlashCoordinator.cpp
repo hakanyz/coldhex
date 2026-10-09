@@ -160,8 +160,13 @@ void FlashCoordinator::onEngineProgressChanged(int percentage, const QString& st
 void FlashCoordinator::handleStepFailure(const QString& errorMsg) {
     if (m_config.autoSpeedEnabled && stepDownSpeed()) {
         emit autoSpeedFallbackTriggered(m_config.speedKhz);
-        // Retry sequence with reduced speed
-        startFlashSequence();
+        // Resume from the failed step instead of restarting, so steps that already
+        // succeeded (e.g. erase, Slot 1) are not repeated. The engine takes the speed
+        // from its connect call, so a lower speed requires reconnecting first.
+        if (m_currentStep != CoordinatorStep::Connecting) {
+            m_plannedSteps.insert(m_currentStepIndex, CoordinatorStep::Connecting);
+        }
+        executeNextStep();
         return;
     }
 
