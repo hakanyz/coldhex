@@ -68,13 +68,36 @@ HexParseResult HexParser::analyzeHexFile(const QString& filePath, bool extractDa
 
         bool ok = false;
         uint8_t byteCount = line.mid(1, 2).toUInt(&ok, 16);
-        if (!ok) continue;
+        if (!ok) {
+            result.errorMessage = QString("Line %1: Invalid byte count field").arg(lineNum);
+            return result;
+        }
+
+        if (line.length() != 11 + byteCount * 2) {
+            result.errorMessage = QString("Line %1: Record length does not match its byte count").arg(lineNum);
+            return result;
+        }
+
+        // All record bytes including the checksum must sum to zero (mod 256).
+        uint8_t sum = 0;
+        for (int i = 1; i + 1 < line.length(); i += 2) {
+            uint8_t b = line.mid(i, 2).toUInt(&ok, 16);
+            if (!ok) {
+                result.errorMessage = QString("Line %1: Non-hexadecimal character in record").arg(lineNum);
+                return result;
+            }
+            sum = static_cast<uint8_t>(sum + b);
+        }
+        if (sum != 0) {
+            result.errorMessage = QString("Line %1: Checksum mismatch").arg(lineNum);
+            return result;
+        }
 
         uint16_t addressOffset = line.mid(3, 4).toUInt(&ok, 16);
-        if (!ok) continue;
+        if (!ok) { result.errorMessage = QString("Line %1: Invalid address field").arg(lineNum); return result; }
 
         uint8_t recordType = line.mid(7, 2).toUInt(&ok, 16);
-        if (!ok) continue;
+        if (!ok) { result.errorMessage = QString("Line %1: Invalid record type field").arg(lineNum); return result; }
 
         if (recordType == 0x00) { // Data Record
             uint32_t fullAddress = upperAddress + addressOffset;

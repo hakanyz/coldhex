@@ -32,7 +32,7 @@ private slots:
 
     void appliesExtendedLinearAddress() {
         QTemporaryFile f;
-        writeTemp(f, ":020000040800F2\n:0200100000FFED\n:00000001FF\n");
+        writeTemp(f, ":020000040800F2\n:0200100000FFEF\n:00000001FF\n");
         auto r = HexParser::analyzeHexFile(f.fileName());
         QVERIFY(r.success);
         QCOMPARE(r.baseAddress, 0x08000010u);
@@ -63,6 +63,35 @@ private slots:
         auto r = HexParser::analyzeHexFile(f.fileName());
         QVERIFY(!r.success);
         QVERIFY(!r.errorMessage.isEmpty());
+    }
+
+    void rejectsChecksumMismatch() {
+        QTemporaryFile f;
+        writeTemp(f, ":0400000001020304F3\n:00000001FF\n");  // correct checksum is F2
+        auto r = HexParser::analyzeHexFile(f.fileName());
+        QVERIFY(!r.success);
+        QVERIFY(r.errorMessage.contains("Checksum"));
+        QVERIFY(r.errorMessage.contains("Line 1"));
+    }
+
+    void rejectsRecordLengthMismatch() {
+        QTemporaryFile f;
+        writeTemp(f, ":0400000001020304F2\n:0400000001020F2\n:00000001FF\n");
+        auto r = HexParser::analyzeHexFile(f.fileName());
+        QVERIFY(!r.success);
+        QVERIFY(r.errorMessage.contains("Line 2"));
+    }
+
+    void rejectsNonHexCharacters() {
+        QTemporaryFile f;
+        writeTemp(f, ":0100000ZAA55\n:00000001FF\n");
+        QVERIFY(!HexParser::analyzeHexFile(f.fileName()).success);
+    }
+
+    void acceptsCrLfLineEndings() {
+        QTemporaryFile f;
+        writeTemp(f, ":0400000001020304F2\r\n:00000001FF\r\n");
+        QVERIFY(HexParser::analyzeHexFile(f.fileName()).success);
     }
 
     void rejectsHexWithoutDataRecords() {
