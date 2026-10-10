@@ -101,7 +101,11 @@ else()
     set(PROBEDESK_PROBE_RS_DEST "lib/probedesk")
     set(PROBEDESK_NOTICE_DEST "share/doc/probedesk")
 endif()
-install(FILES packaging/THIRD_PARTY_NOTICES.md DESTINATION ${PROBEDESK_NOTICE_DEST})
+install(FILES
+    packaging/THIRD_PARTY_NOTICES.md
+    packaging/licenses/Qt-LGPL-3.0.txt
+    packaging/licenses/GPL-3.0.txt
+    DESTINATION ${PROBEDESK_NOTICE_DEST})
 
 if(PROBEDESK_PROBE_RS_DIR)
     find_program(PROBEDESK_PROBE_RS_EXE NAMES probe-rs PATHS "${PROBEDESK_PROBE_RS_DIR}" NO_DEFAULT_PATH REQUIRED)
