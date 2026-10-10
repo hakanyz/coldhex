@@ -15,6 +15,6 @@
         <file alias="dock/restore.svg">icons/dock/restore.svg</file>
     </qresource>
     <qresource prefix="/theme">
-        <file alias="dark.qss">theme/dark.qss</file>
+        <file alias="dark.qss.in">theme/dark.qss.in</file>
     </qresource>
 </RCC>

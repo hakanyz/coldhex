@@ -1,4 +1,5 @@
 #include "ConsoleDock.h"
+#include "Theme.h"
 #include <QAction>
 #include <QDateTime>
 #include <QDir>
@@ -28,19 +29,20 @@ ConsoleDock::ConsoleDock(QMainWindow* window, QDockWidget* dock, QPlainTextEdit*
     connect(saveAction, &QAction::triggered, this, &ConsoleDock::saveToFile);
 }
 
-void ConsoleDock::append(const QString& level, const QString& message, const QString& colorHex) {
+void ConsoleDock::append(const QString& level, const QString& message) {
     const QString time = QDateTime::currentDateTime().toString("HH:mm:ss");
     const QString line =
-        QString("<span style='color: #888888;'>[%1]</span> "
-                "<span style='color: %2; font-weight: bold;'>%3:</span> "
-                "<span style='color: #dcdcdc;'>%4</span>")
-            .arg(time, colorHex, level, message.toHtmlEscaped().replace("\n", "<br>"));
+        QString("<span style='color: %1;'>[%2]</span> "
+                "<span style='color: %3; font-weight: bold;'>%4:</span> "
+                "<span style='color: %5;'>%6</span>")
+            .arg(Theme::hex(Theme::Color::textMuted), time, Theme::logColor(level), level,
+                 Theme::hex(Theme::Color::text), message.toHtmlEscaped().replace("\n", "<br>"));
     m_log->appendHtml(line);
 
     // A minimized console cannot be read: flag problems on its small title bar.
     if (m_minimized && (level == "ERROR" || level == "WARNING" || level == "WARN")) {
         m_title->setText("Console Output  \u25CF");
-        m_title->setStyleSheet("font-weight: bold; color: #e5645a;");
+        m_title->setStyleSheet(QString("font-weight: bold; color: %1;").arg(Theme::hex(Theme::Color::logError)));
     }
 }
 
@@ -77,10 +79,11 @@ void ConsoleDock::buildTitleBar() {
     layout->addWidget(m_title);
     layout->addStretch();
 
-    const QString buttonStyle =
+    const QString buttonStyle = QString(
         "QToolButton { border: none; border-radius: 3px; padding: 1px; }"
-        "QToolButton:hover { background: #3a3d42; }"
-        "QToolButton:pressed { background: #2a2c30; }";
+        "QToolButton:hover { background: %1; }"
+        "QToolButton:pressed { background: %2; }")
+        .arg(Theme::hex(Theme::Color::hover), Theme::hex(Theme::Color::pressed));
     auto makeButton = [&](const char* icon, const QString& tip) {
         auto* b = new QToolButton(bar);
         b->setIcon(QIcon(icon));

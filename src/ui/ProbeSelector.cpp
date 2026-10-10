@@ -128,7 +128,7 @@ void ProbeSelector::onProbeListReady(bool success, const QList<ProbeInfo>& probe
     m_verbose = false;
 
     if (!success) {
-        if (verbose || !m_lastError) emit message("ERROR", error, "#ff5555");
+        if (verbose || !m_lastError) emit message("ERROR", error);
         m_lastError = true;
         return;
     }
@@ -146,14 +146,14 @@ void ProbeSelector::onProbeListReady(bool success, const QList<ProbeInfo>& probe
     if (probes.isEmpty()) {
         // Empty data means "let probe-rs pick"; connecting will report the real error.
         m_box->addItem("(no probe detected)", QString());
-        emit message("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.", "#e67e22");
+        emit message("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
         return;
     }
 
     for (const ProbeInfo& p : probes) {
         const QString label = p.displayName + " [" + p.selector() + "]";
         m_box->addItem(label, p.selector());
-        emit message("INFO", QString("Found probe: %1").arg(label), "#5dade2");
+        emit message("INFO", QString("Found probe: %1").arg(label));
     }
     const int idx = m_box->findText(previous);
     if (idx >= 0) m_box->setCurrentIndex(idx);
@@ -162,7 +162,7 @@ void ProbeSelector::onProbeListReady(bool success, const QList<ProbeInfo>& probe
         const QString msg = QString("%1 probes found. Using: %2. Check the Probe selection before flashing.")
                                 .arg(probes.size())
                                 .arg(m_box->currentText());
-        emit message("WARNING", msg, "#ffb86c");
+        emit message("WARNING", msg);
         emit status(msg, 8000);
     }
 }

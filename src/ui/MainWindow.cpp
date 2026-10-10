@@ -251,8 +251,8 @@ bool MainWindow::prepareEngine() {
 }
 
 // Returns false (after telling the user) when the chip name is not known to probe-rs.
-void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
-    m_console->append(levelStr, message, colorHex);
+void MainWindow::appendLog(const QString& levelStr, const QString& message) {
+    m_console->append(levelStr, message);
 }
 
 void MainWindow::updateUiState() {
@@ -326,7 +326,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
                                 .arg(uint64_t(range1.start) + range1.size - 1, 8, 16, QLatin1Char('0'))
                                 .arg(range2.start, 8, 16, QLatin1Char('0'))
                                 .arg(uint64_t(range2.start) + range2.size - 1, 8, 16, QLatin1Char('0'));
-        appendLog("ERROR", msg, "#ff5555");
+        appendLog("ERROR", msg);
         QMessageBox::warning(this, "Address Overlap", msg);
         return false;
     }
@@ -354,7 +354,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
                 msg += ".";
             }
             msg += "\nCheck the start address of the slot and the selected chip.";
-            appendLog("ERROR", msg, "#ff5555");
+            appendLog("ERROR", msg);
             QMessageBox::warning(this, "Outside Flash Range", msg);
             return false;
         }
@@ -410,7 +410,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
     uint32_t address = 0;
     if (!slotAddress(slotIndex, address)) {
         const QString msg = QString("%1: invalid start address.").arg(slot.label);
-        appendLog("ERROR", msg, "#ff5555");
+        appendLog("ERROR", msg);
         QMessageBox::warning(this, "Invalid Address", msg);
         return false;
     }
@@ -428,7 +428,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
     }
     if (!res.success) {
         const QString msg = QString("%1: %2").arg(slot.label, res.errorMessage);
-        appendLog("ERROR", msg, "#ff5555");
+        appendLog("ERROR", msg);
         QMessageBox::warning(this, "Invalid Firmware File", msg);
         return false;
     }
@@ -494,7 +494,7 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
     }
 
     if (!res.success) {
-        appendLog("ERROR", QString("Cannot load '%1': %2").arg(fi.fileName(), res.errorMessage), "#ff5555");
+        appendLog("ERROR", QString("Cannot load '%1': %2").arg(fi.fileName(), res.errorMessage));
     }
 
     if (slotIndex == 1) {
@@ -560,15 +560,14 @@ void MainWindow::updateMemoryViewer() {
 
 void MainWindow::onEngineLogMessage(const QString& message, EngineLogLevel level) {
     QString levelStr = "INFO";
-    QString color = "#5dade2";
     switch (level) {
-    case EngineLogLevel::Debug: levelStr = "DEBUG"; color = "#95a5a6"; break;
-    case EngineLogLevel::Info: levelStr = "INFO"; color = "#5dade2"; break;
-    case EngineLogLevel::Warning: levelStr = "WARN"; color = "#f39c12"; break;
-    case EngineLogLevel::Error: levelStr = "ERROR"; color = "#e74c3c"; break;
-    case EngineLogLevel::Success: levelStr = "SUCCESS"; color = "#2ecc71"; break;
+    case EngineLogLevel::Debug: levelStr = "DEBUG"; break;
+    case EngineLogLevel::Info: levelStr = "INFO"; break;
+    case EngineLogLevel::Warning: levelStr = "WARN"; break;
+    case EngineLogLevel::Error: levelStr = "ERROR"; break;
+    case EngineLogLevel::Success: levelStr = "SUCCESS"; break;
     }
-    appendLog(levelStr, message, color);
+    appendLog(levelStr, message);
 }
 
 void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
@@ -576,10 +575,10 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     updateUiState();
     if (success) {
         ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
-        appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()), "#2ecc71");
+        appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
     } else {
         ui->statusBar->showMessage("Connection Failed");
-        appendLog("ERROR", "Connection failed.", "#e74c3c");
+        appendLog("ERROR", "Connection failed.");
 
         // The user pressed Connect: explain what is probably wrong and offer the wiring guide.
         // (A failed connect inside a flash sequence is handled by the sequence itself.)
@@ -614,9 +613,9 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
     updateUiState();
     if (success) {
         ui->progressBar->setValue(100);
-        appendLog("SUCCESS", message, "#2ecc71");
+        appendLog("SUCCESS", message);
     } else {
-        appendLog("ERROR", message, "#e74c3c");
+        appendLog("ERROR", message);
     }
 }
 
@@ -629,7 +628,7 @@ void MainWindow::onTotalProgressChanged(int overallPercentage) {
 }
 
 void MainWindow::onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz) {
-    appendLog("WARN", QString("Auto-Speed fallback triggered -> %1 kHz. Retrying...").arg(newSpeedKhz), "#e67e22");
+    appendLog("WARN", QString("Auto-Speed fallback triggered -> %1 kHz. Retrying...").arg(newSpeedKhz));
     ui->spinSpeed->setValue(static_cast<int>(newSpeedKhz));
 }
 
@@ -647,7 +646,7 @@ void MainWindow::onSystemCheckTriggered() {
 // After a chip was picked or typed: if it belongs to another manufacturer than the one
 // shown, switch the manufacturer box so the two always agree.
 void MainWindow::onCancelTriggered() {
-    appendLog("WARNING", "Stopping the running operation...", "#e67e22");
+    appendLog("WARNING", "Stopping the running operation...");
     if (m_sequenceRunning) {
         m_coordinator->cancelSequence();
     } else {
@@ -673,9 +672,9 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
             m_targetReadBaseAddress = m_pendingReadBase;
             ui->radioSourceTarget->setChecked(true);
             updateMemoryViewer();
-            appendLog("SUCCESS", QString("Read %1 bytes into %2").arg(m_targetReadData.size()).arg(file), "#2ecc71");
+            appendLog("SUCCESS", QString("Read %1 bytes into %2").arg(m_targetReadData.size()).arg(file));
         } else if (success) {
-            appendLog("ERROR", "The read finished, but the output file could not be opened: " + file, "#e74c3c");
+            appendLog("ERROR", "The read finished, but the output file could not be opened: " + file);
         }
         return;
     }
@@ -694,7 +693,7 @@ void MainWindow::onReadTargetTriggered() {
     const MemoryRegion* flash = memory.mainFlash();
     if (!flash) {
         const QString msg = "The flash size of this chip is unknown, so the whole flash cannot be read.";
-        appendLog("ERROR", msg, "#ff5555");
+        appendLog("ERROR", msg);
         QMessageBox::warning(this, "Read Flash", msg);
         return;
     }

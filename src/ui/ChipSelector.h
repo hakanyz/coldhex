@@ -43,8 +43,8 @@ public:
     void clearChipFiles();
 
 signals:
-    // Something worth writing to the console: level ("INFO", "ERROR"...), text, color.
-    void message(const QString& level, const QString& text, const QString& colorHex);
+    // Something worth writing to the console: level ("INFO", "ERROR"...) and text.
+    void message(const QString& level, const QString& text);
 
 private slots:
     void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
@@ -53,8 +53,8 @@ private slots:
 
 private:
     void rebuildCatalog();
-    void log(const QString& level, const QString& text, const QString& color = "#dcdcdc") {
-        emit message(level, text, color);
+    void log(const QString& level, const QString& text) {
+        emit message(level, text);
     }
 
     QWidget* m_parent;
