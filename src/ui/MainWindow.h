@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QTimer>
 #include <QStringListModel>
 #include <QComboBox>
 #include <QLabel>
@@ -26,6 +27,10 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
+#ifdef Q_OS_WIN
+    bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
+#endif
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
 
@@ -39,6 +44,7 @@ private slots:
     void onResetTargetTriggered();
     void onOpenHexTriggered();
     void onRefreshProbesTriggered();
+    void onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error);
 
     // Settings Panel Controls
     void onManufacturerChanged(const QString& manufacturer);
@@ -86,6 +92,7 @@ private:
     bool prepareEngine();
     bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
     void rebuildChipCatalog();
+    void scheduleProbeRefresh();
     QString currentProbeRsPath() const;
 
     Ui::MainWindow *ui;
@@ -112,6 +119,13 @@ private:
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
+    bool m_probeRefreshVerbose = false;
+    bool m_lastProbeError = false;
+    QStringList m_lastProbeKeys;
+    bool m_probeListSeen = false;
+    QTimer* m_probeTimer = nullptr;
+    QStringList m_lastUsbKeys;
+    int m_probeSafetyTick = 0;
     QString m_pendingReadFile;       // set while a memory read is running
     uint32_t m_pendingReadBase = 0;
 };

@@ -9,6 +9,13 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QEvent>
+#include "engine/UsbScanner.h"
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <dbt.h>
+#endif
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -46,6 +53,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
     connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
+    connect(m_engine, &ProbeRsEngine::probeListReady, this, &MainWindow::onProbeListReady);
     connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
@@ -97,6 +105,29 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     onRefreshProbesTriggered();
+
+    // Newly plugged-in probes: Windows tells the program about every USB change (nativeEvent),
+    // on Linux a cheap look at /sys/bus/usb every second does the same job. A slow timer stays
+    // as a safety net on both.
+    m_probeTimer = new QTimer(this);
+    connect(m_probeTimer, &QTimer::timeout, this, [this]() {
+#ifndef Q_OS_WIN
+        const QList<UsbDevice> seen = UsbScanner::scan();
+        QStringList keys;
+        for (const UsbDevice& d : seen) keys << d.id();
+        if (keys != m_lastUsbKeys) {
+            m_lastUsbKeys = keys;
+            scheduleProbeRefresh();
+            return;
+        }
+#endif
+        if (m_probeSafetyTick++ % 5 == 0) scheduleProbeRefresh();
+    });
+#ifdef Q_OS_WIN
+    m_probeTimer->start(5000);
+#else
+    m_probeTimer->start(1000);
+#endif
     restoreSettings();
     m_engine->requestChipList();
 
@@ -424,31 +455,64 @@ void MainWindow::updateUiState() {
 }
 
 void MainWindow::onRefreshProbesTriggered() {
-    const QString previous = ui->comboProbe->currentText();
-    const auto probes = m_engine->listAvailableProbes();
+    m_probeRefreshVerbose = true;  // the user asked for it: always report the result
+    m_engine->requestProbeList();
+}
 
+// Fills the probe box with what probe-rs found. Automatic refreshes only write to the log when
+// the set of probes changed; a manual refresh always does.
+void MainWindow::onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error) {
+    const bool verbose = m_probeRefreshVerbose;
+    m_probeRefreshVerbose = false;
+
+    if (!success) {
+        if (verbose || !m_lastProbeError) appendLog("ERROR", error, "#ff5555");
+        m_lastProbeError = true;
+        return;
+    }
+    m_lastProbeError = false;
+
+    QStringList keys;
+    for (const ProbeInfo& p : probes) keys << p.selector();
+    const bool changed = !m_probeListSeen || (keys != m_lastProbeKeys);
+    m_probeListSeen = true;
+    m_lastProbeKeys = keys;
+    if (!changed && !verbose) return;  // leave the box alone, an open drop-down would close
+
+    const QString previous = ui->comboProbe->currentText();
     ui->comboProbe->clear();
     if (probes.isEmpty()) {
         // Empty data means "let probe-rs pick"; connecting will report the real error.
         ui->comboProbe->addItem("(no probe detected)", QString());
-        appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
+        if (verbose || changed) {
+            appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
+        }
         return;
     }
 
     for (const auto& p : probes) {
         const QString label = p.displayName + " [" + p.selector() + "]";
         ui->comboProbe->addItem(label, p.selector());
-        appendLog("INFO", QString("Found probe: %1").arg(label));
+        if (verbose || changed) appendLog("INFO", QString("Found probe: %1").arg(label));
     }
     int idx = ui->comboProbe->findText(previous);
     if (idx >= 0) ui->comboProbe->setCurrentIndex(idx);
 
-    if (probes.size() > 1) {
+    if (probes.size() > 1 && (verbose || changed)) {
         const QString msg = QString("%1 probes found. Using: %2. Check the Probe selection before flashing.")
                                 .arg(probes.size())
                                 .arg(ui->comboProbe->currentText());
         appendLog("WARNING", msg, "#ffb86c");
         ui->statusBar->showMessage(msg, 8000);
+    }
+}
+
+// Probes are plugged in while the program runs: look again whenever the window is activated.
+void MainWindow::changeEvent(QEvent* event) {
+    QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::ActivationChange && isActiveWindow()
+        && !m_isOperationRunning && !m_engine->isBusy()) {
+        m_engine->requestProbeList();
     }
 }
 
@@ -970,3 +1034,28 @@ void MainWindow::onAboutTriggered() {
                 "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
             .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
 }
+
+// Asks probe-rs for the probe list now and once more shortly after: right after a probe is
+// plugged in, the driver may not be ready yet.
+void MainWindow::scheduleProbeRefresh() {
+    auto refresh = [this]() {
+        if (!m_isOperationRunning && !m_engine->isBusy()) m_engine->requestProbeList();
+    };
+    QTimer::singleShot(300, this, refresh);
+    QTimer::singleShot(1500, this, refresh);
+}
+
+#ifdef Q_OS_WIN
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
+    if (eventType == "windows_generic_MSG") {
+        const MSG* msg = static_cast<const MSG*>(message);
+        // Any device arriving, leaving or changing: look at the probes again.
+        if (msg->message == WM_DEVICECHANGE
+            && (msg->wParam == DBT_DEVNODES_CHANGED || msg->wParam == DBT_DEVICEARRIVAL
+                || msg->wParam == DBT_DEVICEREMOVECOMPLETE)) {
+            scheduleProbeRefresh();
+        }
+    }
+    return QMainWindow::nativeEvent(eventType, message, result);
+}
+#endif

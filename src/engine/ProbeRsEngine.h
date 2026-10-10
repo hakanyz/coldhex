@@ -36,7 +36,7 @@ public:
     void cancelCurrentOperation() override;
 
     void requestChipList() override;
-    QList<ProbeInfo> listAvailableProbes() override;
+    void requestProbeList() override;
 
     // The arguments that select chip, probe, protocol and speed for every probe-rs command.
     static QStringList targetArgsFor(const TargetSettings& target);
@@ -60,6 +60,8 @@ private slots:
     void onProcessErrorOccurred(QProcess::ProcessError error);
     void onChipListFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onChipListErrorOccurred(QProcess::ProcessError error);
+    void onProbeListFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onProbeListErrorOccurred(QProcess::ProcessError error);
 
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription);
@@ -71,6 +73,7 @@ private:
     QString m_executablePath = "probe-rs";
     QProcess* m_process = nullptr;
     QProcess* m_chipListProcess = nullptr;
+    QProcess* m_probeListProcess = nullptr;
     EngineState m_state = EngineState::Idle;
     bool m_connected = false;
     bool m_cancelRequested = false;
