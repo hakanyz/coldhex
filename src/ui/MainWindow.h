@@ -4,18 +4,16 @@
 #include <QToolButton>
 #include <QLabel>
 #include <QTimer>
-#include <QStringListModel>
 #include <QComboBox>
 #include <QLabel>
 #include "core/FlashCoordinator.h"
 #include "core/FirmwareTarget.h"
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
-#include "core/ChipCatalog.h"
-#include "engine/ChipDescription.h"
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
 #include "ConsoleDock.h"
+#include "ChipSelector.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -50,17 +48,12 @@ private slots:
     void onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error);
 
     // Settings Panel Controls
-    void onManufacturerChanged(const QString& manufacturer);
-    void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
-    void onAddChipFileTriggered();
-    void onClearChipFilesTriggered();
     void onSystemCheckTriggered();
     void onWiringGuideTriggered();
     void onReadTargetTriggered();
     void onAboutTriggered();
     void onCancelTriggered();
     void onEngineOperationFinished(bool success, const QString& message);
-    void onChipTextCommitted();
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
     void onSlot1PathChanged(const QString& path);
@@ -91,10 +84,8 @@ private:
     void saveSettings();
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
-    bool resolveChip(QString& chip);
     bool prepareEngine();
     bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
-    void rebuildChipCatalog();
     void scheduleProbeRefresh();
     QString currentProbeRsPath() const;
 
@@ -103,6 +94,7 @@ private:
     FlashCoordinator *m_coordinator;
     HexMemoryModel *m_memoryModel;
     ConsoleDock* m_console = nullptr;
+    ChipSelector* m_chipSelector = nullptr;
 
     // Additional toolbar widgets
     QComboBox *m_comboToolbarHexFile = nullptr;
@@ -113,13 +105,6 @@ private:
     QByteArray m_targetReadData;
     uint32_t m_targetReadBaseAddress = 0x08000000;
 
-    QList<ChipEntry> m_builtinChips;  // reported by probe-rs
-    QList<ChipEntry> m_chips;         // built-in plus custom
-    QStringList m_customChipFiles;
-    QStringListModel* m_chipNames = nullptr;
-    bool m_builtinChipsLoaded = false;
-    QString m_pendingManufacturer;  // restored from settings, applied once the chip list arrives
-    QString m_pendingChip;
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
