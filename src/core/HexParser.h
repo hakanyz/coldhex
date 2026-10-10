@@ -18,4 +18,8 @@ public:
     static FileFormat detectFormat(const QString& filePath);
     static HexParseResult analyzeHexFile(const QString& filePath, bool extractData = true);
     static HexParseResult analyzeBinFile(const QString& filePath, uint32_t baseAddress = 0x08000000);
+
+    // 32-bit little-endian ELF (Cortex-M): the loadable segments, placed at their load addresses.
+    static HexParseResult analyzeElfFile(const QString& filePath, bool extractData = true);
+    static HexParseResult parseElf(const QByteArray& file, bool extractData = true);
 };

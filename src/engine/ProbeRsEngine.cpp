@@ -99,6 +99,9 @@ QStringList ProbeRsEngine::imageFormatArgs(const QString& filePath, uint32_t bas
     if (suffix.compare("hex", Qt::CaseInsensitive) == 0 || suffix.compare("ihex", Qt::CaseInsensitive) == 0) {
         return {"--binary-format", "hex"};
     }
+    if (suffix.compare("elf", Qt::CaseInsensitive) == 0 || suffix.compare("axf", Qt::CaseInsensitive) == 0) {
+        return {"--binary-format", "elf"};
+    }
     return {};
 }
 

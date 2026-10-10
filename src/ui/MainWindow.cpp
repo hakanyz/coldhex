@@ -586,9 +586,13 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
     }
 
     HexParseResult res;
-    if (HexParser::detectFormat(path) == FileFormat::IntelHex) {
+    const FileFormat format = HexParser::detectFormat(path);
+    if (format == FileFormat::IntelHex) {
         res = HexParser::analyzeHexFile(path, false);
         address = res.baseAddress;  // HEX records carry their own addresses
+    } else if (format == FileFormat::Elf) {
+        res = HexParser::analyzeElfFile(path, false);
+        address = res.baseAddress;  // so do the segments of an ELF file
     } else {
         res = HexParser::analyzeBinFile(path, address);
     }
@@ -619,14 +623,14 @@ void MainWindow::onOpenHexTriggered() {
 }
 
 void MainWindow::onOpenSlot1Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 1 (Bootloader) File", "", "Firmware Files (*.hex *.bin);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select Slot 1 (Bootloader) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot1Path->setText(file);
     }
 }
 
 void MainWindow::onOpenSlot2Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 2 (Application) File", "", "Firmware Files (*.hex *.bin);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select Slot 2 (Application) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot2Path->setText(file);
     }
@@ -650,6 +654,8 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
     HexParseResult res;
     if (fmt == FileFormat::IntelHex) {
         res = HexParser::analyzeHexFile(path, true);
+    } else if (fmt == FileFormat::Elf) {
+        res = HexParser::analyzeElfFile(path, true);
     } else {
         uint32_t base = 0x08000000;
         slotAddress(slotIndex, base);

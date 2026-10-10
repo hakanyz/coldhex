@@ -4,6 +4,8 @@
 #include <QTextStream>
 #include <algorithm>
 #include <map>
+#include <vector>
+#include <cstdint>
 
 FileFormat HexParser::detectFormat(const QString& filePath) {
     QFileInfo info(filePath);
@@ -145,4 +147,94 @@ HexParseResult HexParser::analyzeHexFile(const QString& filePath, bool extractDa
     }
 
     return result;
+}
+
+namespace {
+
+uint32_t le32(const QByteArray& d, int offset) {
+    const auto* p = reinterpret_cast<const uint8_t*>(d.constData()) + offset;
+    return uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
+}
+
+uint16_t le16(const QByteArray& d, int offset) {
+    const auto* p = reinterpret_cast<const uint8_t*>(d.constData()) + offset;
+    return uint16_t(p[0] | (p[1] << 8));
+}
+
+}  // namespace
+
+HexParseResult HexParser::parseElf(const QByteArray& file, bool extractData) {
+    HexParseResult result;
+
+    if (file.size() < 52 || file.left(4) != QByteArray("\x7f" "ELF", 4)) {
+        result.errorMessage = "Not an ELF file.";
+        return result;
+    }
+    if (file[4] != 1 || file[5] != 1) {
+        result.errorMessage = "Only 32-bit little-endian ELF files (Cortex-M) are supported.";
+        return result;
+    }
+
+    const uint32_t phOffset = le32(file, 28);
+    const uint16_t phSize = le16(file, 42);
+    const uint16_t phCount = le16(file, 44);
+    if (phCount == 0 || phSize < 32) {
+        result.errorMessage = "The ELF file has no program headers.";
+        return result;
+    }
+
+    struct Segment { uint32_t address; uint32_t offset; uint32_t size; };
+    std::vector<Segment> segments;
+    uint64_t lowest = UINT64_MAX;
+    uint64_t highest = 0;
+
+    for (uint16_t i = 0; i < phCount; ++i) {
+        const uint64_t entry = uint64_t(phOffset) + uint64_t(i) * phSize;
+        if (entry + 32 > uint64_t(file.size())) {
+            result.errorMessage = "The ELF program header table is truncated.";
+            return result;
+        }
+        const int e = static_cast<int>(entry);
+        const uint32_t type = le32(file, e);
+        const uint32_t offset = le32(file, e + 4);
+        const uint32_t physical = le32(file, e + 12);  // load address: where it lives in flash
+        const uint32_t fileSize = le32(file, e + 16);
+        if (type != 1 || fileSize == 0) continue;       // PT_LOAD with content only
+
+        if (uint64_t(offset) + fileSize > uint64_t(file.size())) {
+            result.errorMessage = "An ELF segment lies outside the file.";
+            return result;
+        }
+        segments.push_back({physical, offset, fileSize});
+        lowest = std::min<uint64_t>(lowest, physical);
+        highest = std::max<uint64_t>(highest, uint64_t(physical) + fileSize);
+    }
+
+    if (segments.empty()) {
+        result.errorMessage = "The ELF file contains no loadable data.";
+        return result;
+    }
+
+    result.success = true;
+    result.baseAddress = static_cast<uint32_t>(lowest);
+    result.size = static_cast<uint32_t>(highest - lowest);
+
+    if (extractData && result.size <= 16 * 1024 * 1024) {
+        result.data.fill(static_cast<char>(0xFF), static_cast<int>(result.size));
+        for (const Segment& s : segments) {
+            result.data.replace(static_cast<int>(s.address - lowest), static_cast<int>(s.size),
+                                file.mid(static_cast<int>(s.offset), static_cast<int>(s.size)));
+        }
+    }
+    return result;
+}
+
+HexParseResult HexParser::analyzeElfFile(const QString& filePath, bool extractData) {
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        HexParseResult result;
+        result.errorMessage = "Failed to open ELF file: " + filePath;
+        return result;
+    }
+    return parseElf(file.readAll(), extractData);
 }
