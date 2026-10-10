@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ProbeDesk - [Untitled Project]</string>
+   <string>ProbeDesk</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="centralLayout">
@@ -44,7 +44,7 @@
             </font>
            </property>
            <property name="text">
-            <string>Memory Map (STM32F407VGT6) - Flash</string>
+            <string>Memory Map</string>
            </property>
           </widget>
          </item>

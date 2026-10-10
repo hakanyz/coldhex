@@ -30,7 +30,7 @@ QVariant HexMemoryModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole) {
         if (col == 0) {
             uint32_t addr = m_baseAddress + (row * 16);
-            return QString("0x%1").arg(addr, 8, 16, QLatin1Char('0')).toUpper();
+            return "0x" + QString("%1").arg(addr, 8, 16, QLatin1Char('0')).toUpper();
         }
 
         if (col >= 1 && col <= 16) {

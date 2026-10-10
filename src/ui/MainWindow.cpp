@@ -92,7 +92,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Model selection updates memory map title
     connect(ui->comboModel, &QComboBox::currentTextChanged, [this](const QString& model) {
-        ui->lblMemoryMapTitle->setText(QString("Memory Map (%1) - Flash").arg(model.trimmed()));
+        const QString name = model.trimmed();
+        ui->lblMemoryMapTitle->setText(name.isEmpty() ? QString("Memory Map") : QString("Memory Map (%1) - Flash").arg(name));
     });
 
     onRefreshProbesTriggered();
