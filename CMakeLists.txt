@@ -44,6 +44,8 @@ set(SOURCES
     src/engine/SystemCheck.h
     src/engine/SystemCheck.cpp
     src/ui/SystemCheckDialog.h
+    src/ui/ConsoleDock.h
+    src/ui/ConsoleDock.cpp
     src/ui/SystemCheckDialog.cpp
     src/ui/Theme.h
     src/ui/Theme.cpp

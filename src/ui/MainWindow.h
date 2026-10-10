@@ -15,6 +15,7 @@
 #include "engine/ChipDescription.h"
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
+#include "ConsoleDock.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -56,7 +57,6 @@ private slots:
     void onSystemCheckTriggered();
     void onWiringGuideTriggered();
     void onReadTargetTriggered();
-    void onSaveLogTriggered();
     void onAboutTriggered();
     void onCancelTriggered();
     void onEngineOperationFinished(bool success, const QString& message);
@@ -96,15 +96,13 @@ private:
     bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
     void rebuildChipCatalog();
     void scheduleProbeRefresh();
-    void setupConsoleTitleBar();
-    void setConsoleMinimized(bool minimized);
-    void ensureConsoleVisible();
     QString currentProbeRsPath() const;
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;
     FlashCoordinator *m_coordinator;
     HexMemoryModel *m_memoryModel;
+    ConsoleDock* m_console = nullptr;
 
     // Additional toolbar widgets
     QComboBox *m_comboToolbarHexFile = nullptr;
@@ -125,10 +123,6 @@ private:
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
-    QToolButton* m_btnConsoleMinimize = nullptr;
-    QLabel* m_consoleTitle = nullptr;
-    bool m_consoleMinimized = false;
-    int m_consoleRestoreHeight = 160;
     bool m_manualConnect = false;  // the user pressed Connect (not a step of a sequence)
     bool m_probeRefreshVerbose = false;
     bool m_lastProbeError = false;

@@ -52,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+    m_console = new ConsoleDock(this, ui->dockConsoleOutput, ui->textLog, ui->actionClearLog, ui->actionSaveLog);
     setAcceptDrops(true);
 
     setupUiCustomizations();
@@ -77,14 +78,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::onConnectTriggered);
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
     connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
-    connect(ui->actionSaveLog, &QAction::triggered, this, &MainWindow::onSaveLogTriggered);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
     connect(ui->actionResetTarget, &QAction::triggered, this, &MainWindow::onResetTargetTriggered);
     connect(ui->actionOpenHex, &QAction::triggered, this, &MainWindow::onOpenHexTriggered);
-    connect(ui->actionClearLog, &QAction::triggered, ui->textLog, &QPlainTextEdit::clear);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
@@ -241,7 +240,7 @@ void MainWindow::setupUiCustomizations() {
 
     // DockWidget properties
     ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
-    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+
 
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
     ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
@@ -265,7 +264,6 @@ void MainWindow::setupUiCustomizations() {
         "QToolButton:pressed { background: #2a2c30; }"
         "QToolButton:disabled { color: #6b6f76; }");
 
-    setupConsoleTitleBar();
 
     // View menu: show or hide the side panel and the console (they can also be closed with their X).
     QMenu* viewMenu = new QMenu("View", this);
@@ -277,19 +275,6 @@ void MainWindow::setupUiCustomizations() {
     viewMenu->addAction(toggleSettings);
     viewMenu->addAction(toggleConsole);
     menuBar()->insertMenu(ui->menuHelp->menuAction(), viewMenu);
-
-    // Right-click in the console: Copy, Select All, Clear and Save. Ctrl+L clears it as well.
-    ui->textLog->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->textLog, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
-        QMenu* menu = ui->textLog->createStandardContextMenu();
-        menu->addSeparator();
-        menu->addAction(ui->actionClearLog);
-        menu->addAction(ui->actionSaveLog);
-        menu->setAttribute(Qt::WA_DeleteOnClose);
-        menu->popup(ui->textLog->mapToGlobal(pos));
-    });
-    ui->actionClearLog->setShortcut(QKeySequence("Ctrl+L"));
-    ui->actionClearLog->setToolTip("Clear the console output (Ctrl+L)");
 
     ui->statusBar->showMessage("Ready");
 }
@@ -492,16 +477,7 @@ bool MainWindow::resolveChip(QString& chip) {
 }
 
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
-    QString timeStr = QDateTime::currentDateTime().toString("HH:mm:ss");
-    QString formatted = QString("<span style='color: #888888;'>[%1]</span> <span style='color: %2; font-weight: bold;'>%3:</span> <span style='color: #dcdcdc;'>%4</span>")
-                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped().replace("\n", "<br>"));
-    ui->textLog->appendHtml(formatted);
-
-    // A minimized console cannot be read: flag problems on its small title bar.
-    if (m_consoleMinimized && m_consoleTitle && (levelStr == "ERROR" || levelStr == "WARNING" || levelStr == "WARN")) {
-        m_consoleTitle->setText("Console Output  ●");
-        m_consoleTitle->setStyleSheet("font-weight: bold; color: #e5645a;");
-    }
+    m_console->append(levelStr, message, colorHex);
 }
 
 void MainWindow::updateUiState() {
@@ -579,7 +555,7 @@ void MainWindow::changeEvent(QEvent* event) {
 }
 
 void MainWindow::onConnectTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
     const QString chip = ui->comboModel->currentText().trimmed();
     const uint32_t speed = ui->spinSpeed->value();
@@ -597,7 +573,7 @@ void MainWindow::onDisconnectTriggered() {
 }
 
 void MainWindow::onEraseTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (QMessageBox::question(this, "Confirm Erase",
             "Are you sure you want to completely erase the target chip flash?",
             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
@@ -672,7 +648,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
 }
 
 void MainWindow::onProgramTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -686,7 +662,7 @@ void MainWindow::onProgramTriggered() {
 }
 
 void MainWindow::onVerifyTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -749,7 +725,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
 }
 
 void MainWindow::onResetTargetTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
     m_engine->resetTarget(false);
 }
@@ -1013,7 +989,7 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
 }
 
 void MainWindow::onReadTargetTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
 
     const QString chip = ui->comboModel->currentText().trimmed();
@@ -1040,21 +1016,6 @@ void MainWindow::onReadTargetTriggered() {
     appendLog("INFO", QString("Reading %1 KiB of flash from 0x%2...")
                           .arg(flash->size / 1024).arg(flash->start, 8, 16, QLatin1Char('0')));
     m_engine->readMemory(flash->start, flash->size, file);
-}
-
-void MainWindow::onSaveLogTriggered() {
-    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
-                                  .filePath("coldhex-log.txt");
-    const QString file = QFileDialog::getSaveFileName(this, "Save Log", suggested, "Text (*.txt);;All Files (*.*)");
-    if (file.isEmpty()) return;
-
-    QFile out(file);
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "Save Log", "Cannot write to " + file);
-        return;
-    }
-    out.write(ui->textLog->toPlainText().toUtf8());
-    appendLog("INFO", "Log saved to " + file);
 }
 
 namespace {
@@ -1182,68 +1143,4 @@ void MainWindow::onWiringGuideTriggered() {
 
 // A slim title bar for the console with two small buttons: minimize (keeps only the bar, click
 // again to restore) and close (hides the console until the next action reopens it).
-void MainWindow::setupConsoleTitleBar() {
-    auto* bar = new QWidget(ui->dockConsoleOutput);
-    auto* layout = new QHBoxLayout(bar);
-    layout->setContentsMargins(8, 2, 4, 2);
-    layout->setSpacing(2);
-
-    m_consoleTitle = new QLabel("Console Output", bar);
-    m_consoleTitle->setStyleSheet("font-weight: bold;");
-    layout->addWidget(m_consoleTitle);
-    layout->addStretch();
-
-    const QString buttonStyle =
-        "QToolButton { border: none; border-radius: 3px; padding: 1px; }"
-        "QToolButton:hover { background: #3a3d42; }"
-        "QToolButton:pressed { background: #2a2c30; }";
-
-    m_btnConsoleMinimize = new QToolButton(bar);
-    m_btnConsoleMinimize->setIcon(QIcon(":/icons/dock/minimize.svg"));
-    m_btnConsoleMinimize->setIconSize(QSize(14, 14));
-    m_btnConsoleMinimize->setAutoRaise(true);
-    m_btnConsoleMinimize->setStyleSheet(buttonStyle);
-    m_btnConsoleMinimize->setToolTip("Minimize the console");
-    connect(m_btnConsoleMinimize, &QToolButton::clicked, this, [this]() { setConsoleMinimized(!m_consoleMinimized); });
-    layout->addWidget(m_btnConsoleMinimize);
-
-    auto* closeButton = new QToolButton(bar);
-    closeButton->setIcon(QIcon(":/icons/dock/close.svg"));
-    closeButton->setIconSize(QSize(14, 14));
-    closeButton->setAutoRaise(true);
-    closeButton->setStyleSheet(buttonStyle);
-    closeButton->setToolTip("Close the console (it opens again with the next action, or via View > Console Output)");
-    connect(closeButton, &QToolButton::clicked, ui->dockConsoleOutput, &QWidget::hide);
-    layout->addWidget(closeButton);
-
-    ui->dockConsoleOutput->setTitleBarWidget(bar);
-
-    // Showing the console again (View menu, F12) always shows it expanded.
-    connect(ui->dockConsoleOutput, &QDockWidget::visibilityChanged, this, [this](bool visible) {
-        if (visible && m_consoleMinimized) setConsoleMinimized(false);
-    });
-}
-
-void MainWindow::setConsoleMinimized(bool minimized) {
-    if (minimized == m_consoleMinimized) return;
-    QDockWidget* dock = ui->dockConsoleOutput;
-
-    if (minimized) {
-        m_consoleRestoreHeight = qMax(80, dock->height());
-        dock->widget()->setMaximumHeight(0);  // keep it laid out so the bar keeps the full width
-        resizeDocks({dock}, {dock->titleBarWidget()->sizeHint().height()}, Qt::Vertical);
-    } else {
-        dock->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        resizeDocks({dock}, {m_consoleRestoreHeight}, Qt::Vertical);
-        m_consoleTitle->setText("Console Output");
-        m_consoleTitle->setStyleSheet("font-weight: bold;");
-    }
-    m_consoleMinimized = minimized;
-    m_btnConsoleMinimize->setIcon(QIcon(minimized ? ":/icons/dock/restore.svg" : ":/icons/dock/minimize.svg"));
-    m_btnConsoleMinimize->setToolTip(minimized ? "Restore the console" : "Minimize the console");
-}
-
 // A closed console opens again when the user starts something. A minimized one stays small.
-void MainWindow::ensureConsoleVisible() {
-    if (!ui->dockConsoleOutput->isVisible()) ui->dockConsoleOutput->show();
-}
