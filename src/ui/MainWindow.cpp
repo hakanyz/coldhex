@@ -9,6 +9,9 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QMenuBar>
+#include <QMenu>
+#include <QKeySequence>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QTextBrowser>
@@ -236,8 +239,8 @@ void MainWindow::setupUiCustomizations() {
     ui->textLog->setFont(monoFont);
 
     // DockWidget properties
-    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
 
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
     ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
@@ -260,6 +263,30 @@ void MainWindow::setupUiCustomizations() {
         "QToolButton:hover { background: #3a3d42; border-color: #4a4e55; }"
         "QToolButton:pressed { background: #2a2c30; }"
         "QToolButton:disabled { color: #6b6f76; }");
+
+    // View menu: show or hide the side panel and the console (they can also be closed with their X).
+    QMenu* viewMenu = new QMenu("View", this);
+    QAction* toggleSettings = ui->dockTargetSettings->toggleViewAction();
+    toggleSettings->setText("Target Settings");
+    QAction* toggleConsole = ui->dockConsoleOutput->toggleViewAction();
+    toggleConsole->setText("Console Output");
+    toggleConsole->setShortcut(QKeySequence("F12"));
+    viewMenu->addAction(toggleSettings);
+    viewMenu->addAction(toggleConsole);
+    menuBar()->insertMenu(ui->menuHelp->menuAction(), viewMenu);
+
+    // Right-click in the console: Copy, Select All, Clear and Save. Ctrl+L clears it as well.
+    ui->textLog->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->textLog, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        QMenu* menu = ui->textLog->createStandardContextMenu();
+        menu->addSeparator();
+        menu->addAction(ui->actionClearLog);
+        menu->addAction(ui->actionSaveLog);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->popup(ui->textLog->mapToGlobal(pos));
+    });
+    ui->actionClearLog->setShortcut(QKeySequence("Ctrl+L"));
+    ui->actionClearLog->setToolTip("Clear the console output (Ctrl+L)");
 
     ui->statusBar->showMessage("Ready");
 }
