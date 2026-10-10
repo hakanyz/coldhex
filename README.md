@@ -1,13 +1,13 @@
-# ProbeDesk
+# ColdHex
 
-[![Build and package](https://github.com/hakanyz/probedesk/actions/workflows/build.yml/badge.svg)](https://github.com/hakanyz/probedesk/actions/workflows/build.yml)
+[![Build and package](https://github.com/hakanyz/coldhex/actions/workflows/build.yml/badge.svg)](https://github.com/hakanyz/coldhex/actions/workflows/build.yml)
 [![License: LGPL v3](https://img.shields.io/badge/license-LGPL--3.0-blue.svg)](LICENSE)
 
 A desktop tool to flash and manage ARM Cortex-M microcontrollers over **ST-Link**, **J-Link** and
 **CMSIS-DAP** probes. It is vendor independent: STM32, GD32, Geehy APM32, TI, NXP, Nordic and
 every other chip supported by [probe-rs](https://probe.rs), in one window.
 
-![ProbeDesk main window](docs/screenshot.png)
+![ColdHex main window](docs/screenshot.png)
 
 > **Status: beta.** The logic is covered by automated tests, but programming has so far seen only
 > limited testing on real hardware. Please report problems through the issue tracker.
@@ -24,7 +24,7 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
   running operation. Erase / verify / reset after programming are optional.
 - **Reliable connections** – SWD or JTAG, adjustable speed, *connect under reset*, and an automatic
   speed reduction that resumes the sequence at the step that failed.
-- **System Check** – on start-up ProbeDesk looks for probe-rs, connected probes and their drivers and
+- **System Check** – on start-up ColdHex looks for probe-rs, connected probes and their drivers and
   tells you what is missing and how to fix it (Help > System Check).
 - **Memory viewer** – inspect a HEX/BIN/ELF file or the data read back from the chip.
 - **Self-contained packages** – probe-rs is included, and so are the Qt libraries on Windows (on Ubuntu apt installs them); nothing else to install
@@ -33,14 +33,14 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 ## Install
 
 Download the package for your system from the
-[Releases](https://github.com/hakanyz/probedesk/releases) page.
+[Releases](https://github.com/hakanyz/coldhex/releases) page.
 
 | System | File | How |
 |---|---|---|
-| Windows 10/11 (64-bit) | `probedesk-<version>-win64.exe` | Run the installer |
-| Windows 10/11 (64-bit) | `probedesk-<version>-win64.zip` | Unpack anywhere, start `bin\probedesk.exe` |
-| Ubuntu 22.04 (64-bit) | `probedesk_<version>_amd64.deb` | `sudo apt install ./probedesk_<version>_amd64.deb` |
-| Linux (64-bit) | `probedesk-<version>-Linux.tar.gz` | Unpack, start `usr/bin/probedesk` (needs the Qt 6 libraries) |
+| Windows 10/11 (64-bit) | `coldhex-<version>-win64.exe` | Run the installer |
+| Windows 10/11 (64-bit) | `coldhex-<version>-win64.zip` | Unpack anywhere, start `bin\coldhex.exe` |
+| Ubuntu 22.04 (64-bit) | `coldhex_<version>_amd64.deb` | `sudo apt install ./coldhex_<version>_amd64.deb` |
+| Linux (64-bit) | `coldhex-<version>-Linux.tar.gz` | Unpack, start `usr/bin/coldhex` (needs the Qt 6 libraries) |
 
 ### Probe drivers
 
@@ -64,7 +64,7 @@ If a driver is missing, **Help > System Check** says so.
 ## Chips that probe-rs does not know
 
 Generate a chip description from the vendor's CMSIS-Pack with probe-rs'
-[`target-gen`](https://github.com/probe-rs/probe-rs/releases) and add it in ProbeDesk:
+[`target-gen`](https://github.com/probe-rs/probe-rs/releases) and add it in ColdHex:
 
 ```
 target-gen pack <vendor>.pack <output-folder>
@@ -90,7 +90,7 @@ The program looks for `probe-rs` next to itself, then on `PATH`. Install it from
 ### Packages
 
 ```
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPROBEDESK_PROBE_RS_DIR=<folder with probe-rs>
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCOLDHEX_PROBE_RS_DIR=<folder with probe-rs>
 cmake --build build
 cd build && cpack
 ```
@@ -134,7 +134,7 @@ Please make sure `ctest` passes and describe what you changed and how you tested
 
 ## License
 
-ProbeDesk is licensed under the [GNU Lesser General Public License v3.0](LICENSE) (the GPL text it
+ColdHex is licensed under the [GNU Lesser General Public License v3.0](LICENSE) (the GPL text it
 refers to is in [COPYING](COPYING)). Third-party components – Qt (LGPL v3), probe-rs (MIT or
 Apache-2.0) and the generated chip descriptions – are listed in
 [packaging/THIRD_PARTY_NOTICES.md](packaging/THIRD_PARTY_NOTICES.md).

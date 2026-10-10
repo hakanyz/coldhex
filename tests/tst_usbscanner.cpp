@@ -59,8 +59,8 @@ private slots:
     }
 
     void locatorSearchesLibFolderOfLinuxPackage() {
-        const QStringList dirs = ProbeRsLocator::candidateDirs("/opt/probedesk/bin", "/home/u");
-        QVERIFY(dirs.contains("/opt/probedesk/lib/probedesk"));
+        const QStringList dirs = ProbeRsLocator::candidateDirs("/opt/coldhex/bin", "/home/u");
+        QVERIFY(dirs.contains("/opt/coldhex/lib/coldhex"));
     }
 };
 

@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: >
           cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-          -DPROBEDESK_PROBE_RS_DIR="$PWD/third_party/probe-rs"
+          -DCOLDHEX_PROBE_RS_DIR="$PWD/third_party/probe-rs"
 
       - name: Build
         run: cmake --build build --parallel
@@ -72,8 +72,8 @@ jobs:
         with:
           name: windows-packages
           path: |
-            build/probedesk-*.zip
-            build/probedesk-*.exe
+            build/coldhex-*.zip
+            build/coldhex-*.exe
 
   linux:
     name: Ubuntu 22.04 (.deb, .tar.gz)
@@ -104,7 +104,7 @@ jobs:
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          -DPROBEDESK_PROBE_RS_DIR="$PWD/third_party/probe-rs"
+          -DCOLDHEX_PROBE_RS_DIR="$PWD/third_party/probe-rs"
 
       - name: Build
         run: cmake --build build --parallel
@@ -119,15 +119,15 @@ jobs:
 
       - name: Show package contents
         run: |
-          dpkg-deb --info build/probedesk_*.deb
-          dpkg-deb --contents build/probedesk_*.deb
+          dpkg-deb --info build/coldhex_*.deb
+          dpkg-deb --contents build/coldhex_*.deb
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-packages
           path: |
-            build/probedesk_*.deb
-            build/probedesk-*.tar.gz
+            build/coldhex_*.deb
+            build/coldhex-*.tar.gz
 
   release:
     name: Publish release

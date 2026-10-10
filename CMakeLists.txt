@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(probedesk VERSION 0.1.0 LANGUAGES CXX)
+project(coldhex VERSION 0.1.0 LANGUAGES CXX)
 
 if(WIN32)
     enable_language(RC)
@@ -50,111 +50,111 @@ set(SOURCES
     src/engine/ProbeRsEngine.cpp
 )
 
-qt_add_executable(probedesk
+qt_add_executable(coldhex
     MANUAL_FINALIZATION
     ${SOURCES}
 )
 
 # Application icon: embedded in the Windows executable and available to the program as a Qt resource.
-qt_add_resources(probedesk "app_icons"
+qt_add_resources(coldhex "app_icons"
     PREFIX "/icons"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/probedesk.png"
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png"
 )
 if(WIN32)
-    set(PROBEDESK_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/probedesk.ico")
-    configure_file(resources/probedesk.rc.in ${CMAKE_CURRENT_BINARY_DIR}/probedesk.rc @ONLY)
-    target_sources(probedesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/probedesk.rc)
+    set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
+    configure_file(resources/coldhex.rc.in ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc @ONLY)
+    target_sources(coldhex PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc)
 endif()
-target_compile_definitions(probedesk PRIVATE PROBEDESK_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(coldhex PRIVATE COLDHEX_VERSION="${PROJECT_VERSION}")
 
 # Chip descriptions in resources/chips are built into the executable (see resources/chips/README.md).
 file(GLOB CHIP_YAMLS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/chips/*.yaml)
 if(CHIP_YAMLS)
-    qt_add_resources(probedesk "bundled_chips"
+    qt_add_resources(coldhex "bundled_chips"
         PREFIX "/chips"
         BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/chips"
         FILES ${CHIP_YAMLS}
     )
 endif()
 
-target_include_directories(probedesk PRIVATE
+target_include_directories(coldhex PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(probedesk PRIVATE
+target_link_libraries(coldhex PRIVATE
     Qt6::Widgets
 )
 
-set_target_properties(probedesk PROPERTIES
+set_target_properties(coldhex PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-qt_finalize_executable(probedesk)
+qt_finalize_executable(coldhex)
 
 # ---------------------------------------------------------------------------
 # Installation and packaging
 # ---------------------------------------------------------------------------
 # A probe-rs executable can be shipped inside the package. Point this at a folder that
 # contains it (probe-rs or probe-rs.exe); the packaging workflow downloads it for you.
-set(PROBEDESK_PROBE_RS_DIR "" CACHE PATH "Folder containing the probe-rs executable to ship with the package")
+set(COLDHEX_PROBE_RS_DIR "" CACHE PATH "Folder containing the probe-rs executable to ship with the package")
 
 include(GNUInstallDirs)
 if(WIN32)
     # Qt's deploy script puts the Qt DLLs in bin/, so the program lives there too.
-    install(TARGETS probedesk RUNTIME DESTINATION bin)
+    install(TARGETS coldhex RUNTIME DESTINATION bin)
     # Copies the Qt DLLs and plugins next to the program when the package is built.
     if(COMMAND qt_generate_deploy_app_script)
-        qt_generate_deploy_app_script(TARGET probedesk OUTPUT_SCRIPT PROBEDESK_DEPLOY_SCRIPT NO_UNSUPPORTED_PLATFORM_ERROR)
-        install(SCRIPT ${PROBEDESK_DEPLOY_SCRIPT})
+        qt_generate_deploy_app_script(TARGET coldhex OUTPUT_SCRIPT COLDHEX_DEPLOY_SCRIPT NO_UNSUPPORTED_PLATFORM_ERROR)
+        install(SCRIPT ${COLDHEX_DEPLOY_SCRIPT})
     endif()
-    set(PROBEDESK_PROBE_RS_DEST "bin")
-    set(PROBEDESK_NOTICE_DEST ".")
+    set(COLDHEX_PROBE_RS_DEST "bin")
+    set(COLDHEX_NOTICE_DEST ".")
 else()
-    install(TARGETS probedesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(FILES packaging/linux/probedesk.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-    install(FILES resources/icons/probedesk.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
-    install(FILES resources/icons/probedesk.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
-    install(FILES packaging/linux/69-probedesk.rules DESTINATION lib/udev/rules.d)
-    # The program looks for probe-rs in ../lib/probedesk relative to its own folder.
-    set(PROBEDESK_PROBE_RS_DEST "lib/probedesk")
-    set(PROBEDESK_NOTICE_DEST "share/doc/probedesk")
+    install(TARGETS coldhex RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES packaging/linux/coldhex.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES resources/icons/coldhex.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
+    install(FILES resources/icons/coldhex.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+    install(FILES packaging/linux/69-coldhex.rules DESTINATION lib/udev/rules.d)
+    # The program looks for probe-rs in ../lib/coldhex relative to its own folder.
+    set(COLDHEX_PROBE_RS_DEST "lib/coldhex")
+    set(COLDHEX_NOTICE_DEST "share/doc/coldhex")
 endif()
 install(FILES
     packaging/THIRD_PARTY_NOTICES.md
     packaging/licenses/Qt-LGPL-3.0.txt
     packaging/licenses/GPL-3.0.txt
-    DESTINATION ${PROBEDESK_NOTICE_DEST})
+    DESTINATION ${COLDHEX_NOTICE_DEST})
 
-if(PROBEDESK_PROBE_RS_DIR)
-    find_program(PROBEDESK_PROBE_RS_EXE NAMES probe-rs PATHS "${PROBEDESK_PROBE_RS_DIR}" NO_DEFAULT_PATH REQUIRED)
-    install(PROGRAMS "${PROBEDESK_PROBE_RS_EXE}" DESTINATION ${PROBEDESK_PROBE_RS_DEST})
+if(COLDHEX_PROBE_RS_DIR)
+    find_program(COLDHEX_PROBE_RS_EXE NAMES probe-rs PATHS "${COLDHEX_PROBE_RS_DIR}" NO_DEFAULT_PATH REQUIRED)
+    install(PROGRAMS "${COLDHEX_PROBE_RS_EXE}" DESTINATION ${COLDHEX_PROBE_RS_DEST})
     foreach(license LICENSE-MIT LICENSE-APACHE)
-        if(EXISTS "${PROBEDESK_PROBE_RS_DIR}/${license}")
-            install(FILES "${PROBEDESK_PROBE_RS_DIR}/${license}" DESTINATION ${PROBEDESK_NOTICE_DEST}
+        if(EXISTS "${COLDHEX_PROBE_RS_DIR}/${license}")
+            install(FILES "${COLDHEX_PROBE_RS_DIR}/${license}" DESTINATION ${COLDHEX_NOTICE_DEST}
                     RENAME "probe-rs-${license}")
         endif()
     endforeach()
 endif()
 
-set(CPACK_PACKAGE_NAME "probedesk")
-set(CPACK_PACKAGE_VENDOR "ProbeDesk Project")
+set(CPACK_PACKAGE_NAME "coldhex")
+set(CPACK_PACKAGE_VENDOR "ColdHex Project")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Flash and manage ARM Cortex-M microcontrollers")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_EXECUTABLES "probedesk;ProbeDesk")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "ProbeDesk")
+set(CPACK_PACKAGE_EXECUTABLES "coldhex;ColdHex")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "ColdHex")
 
 if(WIN32)
     # .zip (portable) and .exe (installer)
     set(CPACK_GENERATOR "ZIP;NSIS")
-    set(CPACK_NSIS_DISPLAY_NAME "ProbeDesk")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "probedesk.exe")
+    set(CPACK_NSIS_DISPLAY_NAME "ColdHex")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "coldhex.exe")
     set(CPACK_NSIS_MODIFY_PATH OFF)
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
 else()
     # .deb and .tar.gz
     set(CPACK_GENERATOR "DEB;TGZ")
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ProbeDesk Project")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ColdHex Project")
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1")
@@ -166,8 +166,8 @@ endif()
 include(CPack)
 
 
-option(PROBEDESK_BUILD_TESTS "Build unit tests" ON)
-if(PROBEDESK_BUILD_TESTS)
+option(COLDHEX_BUILD_TESTS "Build unit tests" ON)
+if(COLDHEX_BUILD_TESTS)
     enable_testing()
     find_package(Qt6 REQUIRED COMPONENTS Test)
 

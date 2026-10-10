@@ -1,6 +1,6 @@
 # Bundled chip descriptions
 
-Every `*.yaml` file in this folder is built into the ProbeDesk executable and loaded at
+Every `*.yaml` file in this folder is built into the ColdHex executable and loaded at
 startup, so the chips in it are available without adding files by hand.
 
 The files are probe-rs chip descriptions generated from vendor CMSIS-Packs:

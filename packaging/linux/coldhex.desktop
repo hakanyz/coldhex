@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=ProbeDesk
+Name=ColdHex
 Comment=Flash and manage ARM Cortex-M microcontrollers
-Exec=probedesk
-Icon=probedesk
+Exec=coldhex
+Icon=coldhex
 Terminal=false
 Categories=Development;Electronics;

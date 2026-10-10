@@ -6,7 +6,7 @@ QStringList ProbeRsLocator::candidateDirs(const QString& appDir, const QString& 
     QStringList dirs;
     dirs << appDir
          << QDir::cleanPath(appDir + "/probe-rs")
-         << QDir::cleanPath(appDir + "/../lib/probedesk");
+         << QDir::cleanPath(appDir + "/../lib/coldhex");
     return dirs;
 }
 

@@ -5,7 +5,7 @@
 
 class QTextBrowser;
 
-// Shows what ProbeDesk found on this computer (probe-rs, USB probes, drivers) and what to do
+// Shows what ColdHex found on this computer (probe-rs, USB probes, drivers) and what to do
 // about problems. It never changes the system.
 class SystemCheckDialog : public QDialog {
     Q_OBJECT
