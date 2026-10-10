@@ -7,10 +7,10 @@
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
-    app.setApplicationName("ProbeDesk");
-    app.setApplicationVersion(PROBEDESK_VERSION);
-    app.setWindowIcon(QIcon(":/icons/probedesk.png"));
-    app.setOrganizationName("ProbeDesk Project");
+    app.setApplicationName("ColdHex");
+    app.setApplicationVersion(COLDHEX_VERSION);
+    app.setWindowIcon(QIcon(":/icons/coldhex.png"));
+    app.setOrganizationName("ColdHex Project");
 
     // Fusion style base
     app.setStyle(QStyleFactory::create("Fusion"));

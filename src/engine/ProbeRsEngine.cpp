@@ -23,7 +23,7 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
             this, &ProbeRsEngine::onChipListFinished);
     connect(m_chipListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onChipListErrorOccurred);
 
-    // Prefer a probe-rs shipped with ProbeDesk, then PATH, then the installer's default folder.
+    // Prefer a probe-rs shipped with ColdHex, then PATH, then the installer's default folder.
     const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
     if (!found.isEmpty()) m_executablePath = found;
 }

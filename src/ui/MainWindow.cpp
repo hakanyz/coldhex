@@ -110,7 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
             dialog->deleteLater();
         }
     });
-    appendLog("INFO", "ProbeDesk v0.1 started.");
+    appendLog("INFO", "ColdHex v0.1 started.");
     updateUiState();
 }
 
@@ -901,7 +901,7 @@ void MainWindow::onReadTargetTriggered() {
 
 void MainWindow::onSaveLogTriggered() {
     const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
-                                  .filePath("probedesk-log.txt");
+                                  .filePath("coldhex-log.txt");
     const QString file = QFileDialog::getSaveFileName(this, "Save Log", suggested, "Text (*.txt);;All Files (*.*)");
     if (file.isEmpty()) return;
 
@@ -963,8 +963,8 @@ void MainWindow::dropEvent(QDropEvent* event) {
 }
 
 void MainWindow::onAboutTriggered() {
-    QMessageBox::about(this, "About ProbeDesk",
-        QString("<h3>ProbeDesk %1</h3>"
+    QMessageBox::about(this, "About ColdHex",
+        QString("<h3>ColdHex %1</h3>"
                 "<p>Flash and manage ARM Cortex-M microcontrollers through ST-Link, J-Link and CMSIS-DAP probes. "
                 "Flashing is done by <a href='https://probe.rs'>probe-rs</a>.</p>"
                 "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")

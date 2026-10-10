@@ -1,4 +1,4 @@
-# Lets the logged-in user access the debug probes ProbeDesk supports.
+# Lets the logged-in user access the debug probes ColdHex supports.
 # "uaccess" grants access to the user at the keyboard; no group membership is needed.
 
 # ST-Link (V1, V2, V2-1, V3)
