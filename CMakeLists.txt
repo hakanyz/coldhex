@@ -45,6 +45,8 @@ set(SOURCES
     src/engine/SystemCheck.cpp
     src/ui/SystemCheckDialog.h
     src/ui/SystemCheckDialog.cpp
+    src/ui/Theme.h
+    src/ui/Theme.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -64,6 +66,11 @@ qt_add_resources(coldhex "app_icons"
     PREFIX "/icons"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
     FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS} ${DOCK_ICONS}
+)
+qt_add_resources(coldhex "theme"
+    PREFIX "/theme"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/theme"
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/theme/dark.qss"
 )
 if(WIN32)
     set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
