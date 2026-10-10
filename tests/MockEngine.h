@@ -44,7 +44,7 @@ public:
 
     ChipMemoryMap queryMemoryMap(const QString&, const QString&) override { return memory; }
     void requestChipList() override { emit chipListReady(true, chips, QString()); }
-    QList<ProbeInfo> listAvailableProbes() override { return {}; }
+    void requestProbeList() override { emit probeListReady(true, {}, QString()); }
 
     // Completes the command that is currently running.
     void finish(bool success) {

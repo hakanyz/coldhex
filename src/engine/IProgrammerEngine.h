@@ -75,7 +75,8 @@ public:
 
     // Asynchronous: the result arrives through chipListReady().
     virtual void requestChipList() = 0;
-    virtual QList<ProbeInfo> listAvailableProbes() = 0;
+    // Asynchronous: the result arrives through probeListReady().
+    virtual void requestProbeList() = 0;
 
 signals:
     void connected(bool success, const QString& chipInfo);
@@ -85,4 +86,5 @@ signals:
     void logMessage(const QString& message, EngineLogLevel level);
     void operationFinished(bool success, const QString& message);
     void chipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
+    void probeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error);
 };

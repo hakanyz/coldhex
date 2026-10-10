@@ -225,6 +225,7 @@
      <string>Help</string>
     </property>
     <addaction name="actionSystemCheck"/>
+    <addaction name="actionWiringGuide"/>
     <addaction name="actionAbout"/>
    </widget>
    <addaction name="menuFile"/>
@@ -248,12 +249,15 @@
    </attribute>
    <addaction name="actionConnect"/>
    <addaction name="actionDisconnect"/>
+   <addaction name="separator"/>
    <addaction name="actionRead"/>
    <addaction name="actionErase"/>
    <addaction name="actionProgram"/>
    <addaction name="actionVerify"/>
+   <addaction name="separator"/>
    <addaction name="actionResetTarget"/>
    <addaction name="actionCancel"/>
+   <addaction name="separator"/>
    <addaction name="actionOpenHex"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -671,6 +675,14 @@
   <action name="actionRefreshProbes">
    <property name="text">
     <string>Refresh Probes</string>
+   </property>
+  </action>
+  <action name="actionWiringGuide">
+   <property name="text">
+    <string>Wiring Guide...</string>
+   </property>
+   <property name="toolTip">
+    <string>Which probe signals go where (SWD / JTAG)</string>
    </property>
   </action>
   <action name="actionSystemCheck">

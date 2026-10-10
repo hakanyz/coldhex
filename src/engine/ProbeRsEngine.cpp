@@ -1,6 +1,7 @@
 #include "ProbeRsEngine.h"
 #include "ProbeRsLocator.h"
 #include "ChipDescription.h"
+#include "ConnectionAdvice.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
@@ -11,6 +12,7 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     : IProgrammerEngine(parent),
       m_process(new QProcess(this)),
       m_chipListProcess(new QProcess(this)),
+      m_probeListProcess(new QProcess(this)),
       m_progressRegex(QStringLiteral(R"((\d+)\s*%)"))
 {
     connect(m_process, &QProcess::readyReadStandardOutput, this, &ProbeRsEngine::onProcessReadyReadStdOut);
@@ -22,6 +24,9 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     connect(m_chipListProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProbeRsEngine::onChipListFinished);
     connect(m_chipListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onChipListErrorOccurred);
+    connect(m_probeListProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &ProbeRsEngine::onProbeListFinished);
+    connect(m_probeListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onProbeListErrorOccurred);
 
     // Prefer a probe-rs shipped with ColdHex, then PATH, then the installer's default folder.
     const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
@@ -234,20 +239,25 @@ QList<ProbeInfo> ProbeRsEngine::parseProbeList(const QString& output) {
     return probes;
 }
 
-QList<ProbeInfo> ProbeRsEngine::listAvailableProbes() {
-    QProcess proc;
-    proc.start(m_executablePath, {"list"});
-    if (!proc.waitForStarted(3000)) {
-        emit logMessage(QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath),
-                        EngineLogLevel::Error);
-        return {};
-    }
-    if (!proc.waitForFinished(5000)) {
-        proc.kill();
-        return {};
-    }
+void ProbeRsEngine::requestProbeList() {
+    if (m_probeListProcess->state() != QProcess::NotRunning) return;
+    m_probeListProcess->start(m_executablePath, {"list"});
+}
 
-    return parseProbeList(QString::fromUtf8(proc.readAllStandardOutput()));
+void ProbeRsEngine::onProbeListFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    const QString output = QString::fromUtf8(m_probeListProcess->readAllStandardOutput());
+    if (exitCode != 0 || exitStatus != QProcess::NormalExit) {
+        emit probeListReady(false, {}, QString("'probe-rs list' failed (exit code %1).").arg(exitCode));
+        return;
+    }
+    emit probeListReady(true, parseProbeList(output), QString());
+}
+
+void ProbeRsEngine::onProbeListErrorOccurred(QProcess::ProcessError error) {
+    if (error == QProcess::FailedToStart) {
+        emit probeListReady(false, {},
+                            QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath));
+    }
 }
 
 void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription) {
@@ -255,6 +265,7 @@ void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState,
     m_cancelRequested = false;
     m_stdoutBuffer.clear();
     m_stderrBuffer.clear();
+    m_outputLines.clear();
     m_currentActionDescription = actionDescription;
 
     emit operationStarted(actionDescription);
@@ -293,6 +304,8 @@ void ProbeRsEngine::onProcessReadyReadStdErr() {
 void ProbeRsEngine::parseOutputLine(const QString& line, bool isError) {
     if (line.isEmpty()) return;
 
+    if (m_outputLines.size() < 200) m_outputLines << line;
+
     auto match = m_progressRegex.match(line);
     if (match.hasMatch()) {
         int percent = match.captured(1).toInt();
@@ -325,9 +338,17 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     EngineState completedState = m_state;
     m_state = EngineState::Idle;
 
+    // For a failed command explain the probable cause in plain words.
+    QString advice;
+    if (!success) {
+        advice = ConnectionAdvice::explain(m_outputLines.join('\n'));
+        if (advice.isEmpty() && completedState == EngineState::Connecting) advice = ConnectionAdvice::generic();
+        if (!advice.isEmpty()) emit logMessage(advice, EngineLogLevel::Warning);
+    }
+
     if (completedState == EngineState::Connecting) {
         m_connected = success;
-        emit connected(success, success ? m_target.chipName : "Connection failed.");
+        emit connected(success, success ? m_target.chipName : advice);
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)
