@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QStringListModel>
 #include <QComboBox>
 #include <QLabel>
 #include "core/FlashCoordinator.h"
@@ -43,6 +44,7 @@ private slots:
     void onAddChipFileTriggered();
     void onClearChipFilesTriggered();
     void onSystemCheckTriggered();
+    void onChipTextCommitted();
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
     void onSlot1PathChanged(const QString& path);
@@ -96,6 +98,7 @@ private:
     QList<ChipEntry> m_builtinChips;  // reported by probe-rs
     QList<ChipEntry> m_chips;         // built-in plus custom
     QStringList m_customChipFiles;
+    QStringListModel* m_chipNames = nullptr;
     bool m_builtinChipsLoaded = false;
     QString m_pendingManufacturer;  // restored from settings, applied once the chip list arrives
     QString m_pendingChip;

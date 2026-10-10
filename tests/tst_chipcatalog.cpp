@@ -76,6 +76,16 @@ private slots:
         QVERIFY(ChipCatalog::findEntry(chips, "STM32F407VG")->descriptionFile.isEmpty());
         QVERIFY(!ChipCatalog::findEntry(chips, "nothing"));
     }
+
+    void findsManufacturerOfChip() {
+        QList<ChipEntry> chips = sample();
+        chips.append({"Custom: APM32F1 Series", "APM32F103C8", "C:/chips/apm32f1.yaml"});
+
+        QCOMPARE(ChipCatalog::manufacturerOf(chips, "STM32F407VG"), QString("STM32"));
+        QCOMPARE(ChipCatalog::manufacturerOf(chips, "gd32f303cg"), QString("GD32"));
+        QCOMPARE(ChipCatalog::manufacturerOf(chips, "APM32F103C8"), QString("APM32 / Geehy"));
+        QVERIFY(ChipCatalog::manufacturerOf(chips, "Unknown").isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestChipCatalog)

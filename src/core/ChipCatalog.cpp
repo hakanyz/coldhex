@@ -86,3 +86,12 @@ bool ChipCatalog::find(const QList<ChipEntry>& chips, const QString& name, QStri
     if (canonicalName) *canonicalName = entry->name;
     return true;
 }
+
+QString ChipCatalog::manufacturerOf(const QList<ChipEntry>& chips, const QString& name) {
+    const QStringList groups = manufacturers(chips);
+    for (const QString& group : groups) {
+        if (group == allChipsLabel()) continue;
+        if (chipNames(chips, group).contains(name.trimmed(), Qt::CaseInsensitive)) return group;
+    }
+    return {};
+}

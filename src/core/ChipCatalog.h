@@ -22,5 +22,8 @@ public:
     static bool find(const QList<ChipEntry>& chips, const QString& name, QString* canonicalName = nullptr);
 
     // Same lookup, returning the entry itself (null when not found).
+    // The manufacturer group a chip belongs to (not "All chips"); empty when it fits none.
+    static QString manufacturerOf(const QList<ChipEntry>& chips, const QString& name);
+
     static const ChipEntry* findEntry(const QList<ChipEntry>& chips, const QString& name);
 };

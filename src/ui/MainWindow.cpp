@@ -12,6 +12,8 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QCompleter>
+#include <QLineEdit>
+#include <QStringListModel>
 #include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
@@ -209,11 +211,16 @@ void MainWindow::setupDeviceDatabase() {
     // chip box stays a free-text field so a saved chip name is still usable.
     ui->comboModel->setEditable(true);
     ui->comboModel->setInsertPolicy(QComboBox::NoInsert);
-    if (QCompleter* completer = ui->comboModel->completer()) {
-        completer->setFilterMode(Qt::MatchContains);
-        completer->setCaseSensitivity(Qt::CaseInsensitive);
-        completer->setCompletionMode(QCompleter::PopupCompletion);
-    }
+    // Typing searches every known chip, not only the manufacturer chosen above.
+    m_chipNames = new QStringListModel(this);
+    auto* completer = new QCompleter(m_chipNames, this);
+    completer->setFilterMode(Qt::MatchContains);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setCompletionMode(QCompleter::PopupCompletion);
+    completer->setMaxVisibleItems(15);
+    ui->comboModel->setCompleter(completer);
+    connect(completer, QOverload<const QString&>::of(&QCompleter::activated), this, &MainWindow::onChipTextCommitted);
+    connect(ui->comboModel->lineEdit(), &QLineEdit::editingFinished, this, &MainWindow::onChipTextCommitted);
 
     // Interfaces
     ui->comboInterface->addItems({"SWD", "JTAG"});
@@ -276,6 +283,10 @@ void MainWindow::rebuildChipCatalog() {
         appendLog("INFO", QString("Chip description '%1': %2 chips (%3).")
                               .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
     }
+
+    QStringList allNames;
+    for (const ChipEntry& chip : m_chips) allNames << chip.name;
+    m_chipNames->setStringList(allNames);
 
     if (m_chips.isEmpty()) {
         ui->comboModel->setEditText(m_pendingChip);
@@ -732,4 +743,24 @@ void MainWindow::onSystemCheckTriggered() {
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->runCheck();
     dialog->open();
+}
+
+// After a chip was picked or typed: if it belongs to another manufacturer than the one
+// shown, switch the manufacturer box so the two always agree.
+void MainWindow::onChipTextCommitted() {
+    QTimer::singleShot(0, this, [this]() {
+        QString canonical;
+        if (!ChipCatalog::find(m_chips, ui->comboModel->currentText(), &canonical)) return;
+
+        const QString shown = ui->comboManufacturer->currentText();
+        if (ChipCatalog::chipNames(m_chips, shown).contains(canonical)) {
+            ui->comboModel->setEditText(canonical);
+            return;
+        }
+
+        const QString maker = ChipCatalog::manufacturerOf(m_chips, canonical);
+        const int idx = ui->comboManufacturer->findText(maker.isEmpty() ? ChipCatalog::allChipsLabel() : maker);
+        if (idx >= 0) ui->comboManufacturer->setCurrentIndex(idx);  // keeps the chip name
+        ui->comboModel->setEditText(canonical);
+    });
 }
