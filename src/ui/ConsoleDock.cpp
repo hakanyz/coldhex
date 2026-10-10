@@ -20,8 +20,6 @@ ConsoleDock::ConsoleDock(QMainWindow* window, QDockWidget* dock, QPlainTextEdit*
                          QAction* clearAction, QAction* saveAction)
     : QObject(window), m_window(window), m_dock(dock), m_log(log)
 {
-    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable
-                      | QDockWidget::DockWidgetClosable);
 
     buildTitleBar();
     buildContextMenu(clearAction, saveAction);
@@ -109,7 +107,7 @@ void ConsoleDock::buildTitleBar() {
     });
 }
 
-// Right-click in the console: Copy, Select All, Clear and Save. Ctrl+L clears it as well.
+// Right-click in the console: Copy, Select All, Clear and Save (Clear also has the Ctrl+L shortcut).
 void ConsoleDock::buildContextMenu(QAction* clearAction, QAction* saveAction) {
     m_log->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_log, &QWidget::customContextMenuRequested, this, [this, clearAction, saveAction](const QPoint& pos) {
@@ -120,8 +118,6 @@ void ConsoleDock::buildContextMenu(QAction* clearAction, QAction* saveAction) {
         menu->setAttribute(Qt::WA_DeleteOnClose);
         menu->popup(m_log->mapToGlobal(pos));
     });
-    clearAction->setShortcut(QKeySequence("Ctrl+L"));
-    clearAction->setToolTip("Clear the console output (Ctrl+L)");
 }
 
 void ConsoleDock::setMinimized(bool minimized) {

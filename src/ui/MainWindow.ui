@@ -220,6 +220,11 @@
     <addaction name="actionAddChipFile"/>
     <addaction name="actionClearChipFiles"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+   </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
@@ -232,6 +237,7 @@
    <addaction name="menuEdit"/>
    <addaction name="menuTarget"/>
    <addaction name="menuTools"/>
+   <addaction name="menuView"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
@@ -240,6 +246,12 @@
    </property>
    <property name="toolButtonStyle">
     <enum>Qt::ToolButtonTextUnderIcon</enum>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>18</width>
+     <height>18</height>
+    </size>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -262,6 +274,9 @@
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <widget class="QDockWidget" name="dockTargetSettings">
+   <property name="features">
+    <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetFloatable</set>
+   </property>
    <property name="windowTitle">
     <string>Target Settings</string>
    </property>
@@ -339,7 +354,18 @@
          </widget>
         </item>
         <item row="1" column="1">
-         <widget class="QComboBox" name="comboInterface"/>
+         <widget class="QComboBox" name="comboInterface">
+          <item>
+           <property name="text">
+            <string>SWD</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>JTAG</string>
+           </property>
+          </item>
+         </widget>
         </item>
         <item row="2" column="0">
          <widget class="QLabel" name="lblSpeed">
@@ -542,6 +568,9 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="dockConsoleOutput">
+   <property name="features">
+    <set>QDockWidget::DockWidgetClosable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetFloatable</set>
+   </property>
    <property name="windowTitle">
     <string>Console Output</string>
    </property>
@@ -573,6 +602,10 @@
    </widget>
   </widget>
   <action name="actionConnect">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/connect.svg</normaloff>:/icons/toolbar/connect.svg</iconset>
+   </property>
    <property name="text">
     <string>Connect</string>
    </property>
@@ -581,6 +614,10 @@
    </property>
   </action>
   <action name="actionDisconnect">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/disconnect.svg</normaloff>:/icons/toolbar/disconnect.svg</iconset>
+   </property>
    <property name="text">
     <string>Disconnect</string>
    </property>
@@ -589,6 +626,13 @@
    </property>
   </action>
   <action name="actionRead">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/read.svg</normaloff>:/icons/toolbar/read.svg</iconset>
+   </property>
+   <property name="toolTip">
+    <string>Read the chip flash into a file and show it in the memory view</string>
+   </property>
    <property name="text">
     <string>Read</string>
    </property>
@@ -597,6 +641,10 @@
    </property>
   </action>
   <action name="actionErase">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/erase.svg</normaloff>:/icons/toolbar/erase.svg</iconset>
+   </property>
    <property name="text">
     <string>Erase</string>
    </property>
@@ -605,6 +653,10 @@
    </property>
   </action>
   <action name="actionProgram">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/program.svg</normaloff>:/icons/toolbar/program.svg</iconset>
+   </property>
    <property name="text">
     <string>Program</string>
    </property>
@@ -613,6 +665,13 @@
    </property>
   </action>
   <action name="actionVerify">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/verify.svg</normaloff>:/icons/toolbar/verify.svg</iconset>
+   </property>
+   <property name="toolTip">
+    <string>Compare the target with the selected firmware files</string>
+   </property>
    <property name="text">
     <string>Verify</string>
    </property>
@@ -621,6 +680,10 @@
    </property>
   </action>
   <action name="actionResetTarget">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/reset.svg</normaloff>:/icons/toolbar/reset.svg</iconset>
+   </property>
    <property name="text">
     <string>Reset Target</string>
    </property>
@@ -629,6 +692,10 @@
    </property>
   </action>
   <action name="actionCancel">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/stop.svg</normaloff>:/icons/toolbar/stop.svg</iconset>
+   </property>
    <property name="text">
     <string>Stop</string>
    </property>
@@ -637,6 +704,10 @@
    </property>
   </action>
   <action name="actionOpenHex">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/open.svg</normaloff>:/icons/toolbar/open.svg</iconset>
+   </property>
    <property name="text">
     <string>Open HEX</string>
    </property>
@@ -650,6 +721,12 @@
    </property>
   </action>
   <action name="actionClearLog">
+   <property name="toolTip">
+    <string>Clear the console output (Ctrl+L)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
    <property name="text">
     <string>Clear Console</string>
    </property>
@@ -699,6 +776,8 @@
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="../../resources/coldhex.qrc"/>
+ </resources>
  <connections/>
 </ui>

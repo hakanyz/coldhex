@@ -9,15 +9,20 @@
     }
     QToolButton {
         color: #e0e0e0;
-        padding: 4px 8px;
+        padding: 3px 8px;
+        border: 1px solid transparent;
         border-radius: 4px;
         font-weight: 500;
     }
     QToolButton:hover {
-        background-color: #383a40;
+        background-color: #3a3d42;
+        border-color: #4a4e55;
     }
     QToolButton:pressed {
-        background-color: #007acc;
+        background-color: #2a2c30;
+    }
+    QToolButton:disabled {
+        color: #6b6f76;
     }
     QDockWidget {
         color: #ffffff;

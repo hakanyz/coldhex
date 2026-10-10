@@ -51,7 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupUiCustomizations();
     setupToolBarWidgets();
-    setupDeviceDatabase();
 
     // Engine Signals
     connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
@@ -202,43 +201,15 @@ void MainWindow::setupUiCustomizations() {
     ui->tableMemory->setFont(monoFont);
     ui->textLog->setFont(monoFont);
 
-    // DockWidget properties
-    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
-
-
-    ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
-    ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
-
-    // Toolbar: small icons with the label under them, and visible button states.
-    struct ActionIcon { QAction* action; const char* file; };
-    const ActionIcon icons[] = {
-        {ui->actionConnect, "connect"},   {ui->actionDisconnect, "disconnect"},
-        {ui->actionRead, "read"},         {ui->actionErase, "erase"},
-        {ui->actionProgram, "program"},   {ui->actionVerify, "verify"},
-        {ui->actionResetTarget, "reset"}, {ui->actionCancel, "stop"},
-        {ui->actionOpenHex, "open"},
-    };
-    for (const ActionIcon& a : icons) {
-        a.action->setIcon(QIcon(QString(":/icons/toolbar/%1.svg").arg(a.file)));
-    }
-    ui->mainToolBar->setIconSize(QSize(18, 18));
-    ui->mainToolBar->setStyleSheet(
-        "QToolButton { padding: 3px 8px; border: 1px solid transparent; border-radius: 4px; }"
-        "QToolButton:hover { background: #3a3d42; border-color: #4a4e55; }"
-        "QToolButton:pressed { background: #2a2c30; }"
-        "QToolButton:disabled { color: #6b6f76; }");
-
-
-    // View menu: show or hide the side panel and the console (they can also be closed with their X).
-    QMenu* viewMenu = new QMenu("View", this);
+    // View menu (defined in the .ui file): show or hide the side panel and the console. They can
+    // also be closed with their X.
     QAction* toggleSettings = ui->dockTargetSettings->toggleViewAction();
     toggleSettings->setText("Target Settings");
     QAction* toggleConsole = ui->dockConsoleOutput->toggleViewAction();
     toggleConsole->setText("Console Output");
     toggleConsole->setShortcut(QKeySequence("F12"));
-    viewMenu->addAction(toggleSettings);
-    viewMenu->addAction(toggleConsole);
-    menuBar()->insertMenu(ui->menuHelp->menuAction(), viewMenu);
+    ui->menuView->addAction(toggleSettings);
+    ui->menuView->addAction(toggleConsole);
 
     ui->statusBar->showMessage("Ready");
 }
@@ -259,12 +230,6 @@ void MainWindow::setupToolBarWidgets() {
             ui->radioSourceFile2->setChecked(true);
         }
     });
-}
-
-void MainWindow::setupDeviceDatabase() {
-    // Interfaces
-    ui->comboInterface->addItems({"SWD", "JTAG"});
-    ui->comboInterface->setCurrentText("SWD");
 }
 
 // Pushes the chip, speed and probe currently shown in the UI to the engine, so erase, reset

@@ -70,7 +70,6 @@ private slots:
 private:
     void setupUiCustomizations();
     void setupToolBarWidgets();
-    void setupDeviceDatabase();
     void updateUiState();
     void appendLog(const QString& levelStr, const QString& message, const QString& colorHex = "#dcdcdc");
     void loadFileIntoSlot(int slotIndex, const QString& filePath);

@@ -67,21 +67,11 @@ set(SOURCES
 qt_add_executable(coldhex
     MANUAL_FINALIZATION
     ${SOURCES}
+    resources/coldhex.qrc
 )
 
-# Application icon: embedded in the Windows executable and available to the program as a Qt resource.
-file(GLOB TOOLBAR_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/toolbar/*.svg)
-file(GLOB DOCK_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/dock/*.svg)
-qt_add_resources(coldhex "app_icons"
-    PREFIX "/icons"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS} ${DOCK_ICONS}
-)
-qt_add_resources(coldhex "theme"
-    PREFIX "/theme"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/theme"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/theme/dark.qss"
-)
+# Icons, the style sheet and other resources are listed in resources/coldhex.qrc (also used by the
+# Designer for MainWindow.ui). The generated chip descriptions further below are added separately.
 if(WIN32)
     set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
     configure_file(resources/coldhex.rc.in ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc @ONLY)

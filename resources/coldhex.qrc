@@ -1,0 +1,20 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="coldhex.png">icons/coldhex.png</file>
+        <file alias="toolbar/connect.svg">icons/toolbar/connect.svg</file>
+        <file alias="toolbar/disconnect.svg">icons/toolbar/disconnect.svg</file>
+        <file alias="toolbar/erase.svg">icons/toolbar/erase.svg</file>
+        <file alias="toolbar/open.svg">icons/toolbar/open.svg</file>
+        <file alias="toolbar/program.svg">icons/toolbar/program.svg</file>
+        <file alias="toolbar/read.svg">icons/toolbar/read.svg</file>
+        <file alias="toolbar/reset.svg">icons/toolbar/reset.svg</file>
+        <file alias="toolbar/stop.svg">icons/toolbar/stop.svg</file>
+        <file alias="toolbar/verify.svg">icons/toolbar/verify.svg</file>
+        <file alias="dock/close.svg">icons/dock/close.svg</file>
+        <file alias="dock/minimize.svg">icons/dock/minimize.svg</file>
+        <file alias="dock/restore.svg">icons/dock/restore.svg</file>
+    </qresource>
+    <qresource prefix="/theme">
+        <file alias="dark.qss">theme/dark.qss</file>
+    </qresource>
+</RCC>
