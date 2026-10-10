@@ -9,6 +9,11 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QTextBrowser>
+#include <QVBoxLayout>
+#include <QPushButton>
 #include <QIcon>
 #include <QEvent>
 #include "engine/UsbScanner.h"
@@ -80,6 +85,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
     connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
+    connect(ui->actionWiringGuide, &QAction::triggered, this, &MainWindow::onWiringGuideTriggered);
     connect(ui->actionCancel, &QAction::triggered, this, &MainWindow::onCancelTriggered);
     connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
@@ -458,7 +464,7 @@ bool MainWindow::resolveChip(QString& chip) {
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
     QString timeStr = QDateTime::currentDateTime().toString("HH:mm:ss");
     QString formatted = QString("<span style='color: #888888;'>[%1]</span> <span style='color: %2; font-weight: bold;'>%3:</span> <span style='color: #dcdcdc;'>%4</span>")
-                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped());
+                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped().replace("\n", "<br>"));
     ui->textLog->appendHtml(formatted);
 }
 
@@ -542,6 +548,7 @@ void MainWindow::onConnectTriggered() {
     const uint32_t speed = ui->spinSpeed->value();
     const QString probe = ui->comboProbe->currentData().toString();
 
+    m_manualConnect = true;
     m_isOperationRunning = true;
     updateUiState();
     appendLog("INFO", QString("Connecting to %1 via %2 at %3 kHz...").arg(chip, ui->comboInterface->currentText()).arg(speed));
@@ -840,8 +847,18 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
         appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()), "#2ecc71");
     } else {
         ui->statusBar->showMessage("Connection Failed");
-        appendLog("ERROR", QString("Connection failed: %1").arg(chipInfo), "#e74c3c");
+        appendLog("ERROR", "Connection failed.", "#e74c3c");
+
+        // The user pressed Connect: explain what is probably wrong and offer the wiring guide.
+        // (A failed connect inside a flash sequence is handled by the sequence itself.)
+        if (m_manualConnect) {
+            QMessageBox box(QMessageBox::Warning, "Connection Failed", chipInfo, QMessageBox::Ok, this);
+            QPushButton* guide = box.addButton("Wiring Guide...", QMessageBox::HelpRole);
+            box.exec();
+            if (box.clickedButton() == guide) onWiringGuideTriggered();
+        }
     }
+    m_manualConnect = false;
 }
 
 void MainWindow::onEngineDisconnected() {
@@ -1079,3 +1096,44 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
     return QMainWindow::nativeEvent(eventType, message, result);
 }
 #endif
+
+void MainWindow::onWiringGuideTriggered() {
+    auto* dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle("Wiring Guide");
+    dialog->resize(560, 520);
+
+    auto* view = new QTextBrowser(dialog);
+    view->setOpenExternalLinks(true);
+    view->setHtml(
+        "<h3>Connecting the probe to the target board</h3>"
+        "<p>Pin positions differ between probes and boards. Follow the pin labels of your probe and "
+        "your board; this guide only explains what each signal is for.</p>"
+        "<h4>SWD (2 wires + ground)</h4>"
+        "<table cellpadding='4' border='0'>"
+        "<tr><td><b>GND</b></td><td>Common ground. <b>Always connect it</b>, an unconnected ground is the most common cause of failures.</td></tr>"
+        "<tr><td><b>SWDIO</b></td><td>Bidirectional data line. Goes to the SWDIO pin of the chip.</td></tr>"
+        "<tr><td><b>SWCLK</b></td><td>Clock. Goes to the SWCLK pin of the chip. SWDIO and SWCLK are easy to swap.</td></tr>"
+        "<tr><td><b>3V3 / VTref</b></td><td>Tells the probe the voltage of the target. Many probes only measure it; the board needs its own power.</td></tr>"
+        "<tr><td><b>NRST</b></td><td>Optional reset line. Needed for <i>Connect under reset</i> and helps with chips that disable their debug pins.</td></tr>"
+        "</table>"
+        "<h4>JTAG</h4>"
+        "<p>TMS, TCK, TDI and TDO instead of SWDIO and SWCLK, plus GND, VTref and optionally NRST/TRST.</p>"
+        "<h4>If Connect fails</h4>"
+        "<ul>"
+        "<li>Check GND first, then swap SWDIO and SWCLK if unsure.</li>"
+        "<li>Make sure the board is powered and uses the same voltage level as the probe (3.3 V).</li>"
+        "<li>Keep the wires short; with long wires lower the speed (e.g. 500 kHz).</li>"
+        "<li>Try <i>Connect under reset</i> and connect NRST.</li>"
+        "<li>Check that the right chip and interface (SWD/JTAG) are selected.</li>"
+        "</ul>"
+        "<p>With a probe that works but a board that does not answer, ColdHex reports that the target "
+        "does not respond. That points to wiring, power or chip settings, not to the probe.</p>");
+
+    auto* layout = new QVBoxLayout(dialog);
+    layout->addWidget(view);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
+    layout->addWidget(buttons);
+    dialog->open();
+}

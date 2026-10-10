@@ -52,6 +52,7 @@ private slots:
     void onAddChipFileTriggered();
     void onClearChipFilesTriggered();
     void onSystemCheckTriggered();
+    void onWiringGuideTriggered();
     void onReadTargetTriggered();
     void onSaveLogTriggered();
     void onAboutTriggered();
@@ -119,6 +120,7 @@ private:
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
+    bool m_manualConnect = false;  // the user pressed Connect (not a step of a sequence)
     bool m_probeRefreshVerbose = false;
     bool m_lastProbeError = false;
     QStringList m_lastProbeKeys;
