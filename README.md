@@ -103,18 +103,18 @@ GitHub releases (a tag with a dash, such as `v0.1.0-beta1`, as a pre-release).
 
 ```
 src/
-├── app/        Application entry point and theme
-├── ui/         Qt Widgets interface: main window, memory viewer, System Check
-├── core/       Flash coordinator, firmware parsers, settings, chip catalogue
-└── engine/     Engine interface and the probe-rs driver
+├── app/        Application entry point
+├── ui/         Qt Widgets interface (MainWindow.ui, console, chip and probe selection, dialogs)
+├── core/       Flash sequence, firmware parsers, settings, chip catalogue
+└── engine/     Engine interface, probe-rs driver, system check
 tests/          Unit tests (Qt Test) with a mock engine
-resources/      Icons and bundled chip descriptions
+resources/      Icons, style sheet, bundled chip descriptions
 packaging/      Linux package files, third-party notices
-docs/           Screenshot and the manual test checklist
+docs/           Architecture, UI guide, test checklist, roadmap
 ```
 
-The interface never talks to probe-rs directly: it uses the `IProgrammerEngine` interface, so the
-flashing back-end can be exchanged or mocked in tests.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the layers fit together and
+[docs/UI.md](docs/UI.md) for what to change where in the interface.
 
 ## Testing
 

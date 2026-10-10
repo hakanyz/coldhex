@@ -33,6 +33,8 @@ set(SOURCES
     src/core/SlotValidator.cpp
     src/core/ChipCatalog.h
     src/core/ChipCatalog.cpp
+    src/core/FirmwareFiles.h
+    src/core/FirmwareFiles.cpp
     src/engine/ChipDescription.h
     src/engine/ChipDescription.cpp
     src/engine/BundledChips.h
@@ -44,7 +46,17 @@ set(SOURCES
     src/engine/SystemCheck.h
     src/engine/SystemCheck.cpp
     src/ui/SystemCheckDialog.h
+    src/ui/ConsoleDock.h
+    src/ui/ConsoleDock.cpp
+    src/ui/ChipSelector.h
+    src/ui/ChipSelector.cpp
+    src/ui/ProbeSelector.h
+    src/ui/ProbeSelector.cpp
+    src/ui/HelpDialogs.h
+    src/ui/HelpDialogs.cpp
     src/ui/SystemCheckDialog.cpp
+    src/ui/Theme.h
+    src/ui/Theme.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -55,16 +67,11 @@ set(SOURCES
 qt_add_executable(coldhex
     MANUAL_FINALIZATION
     ${SOURCES}
+    resources/coldhex.qrc
 )
 
-# Application icon: embedded in the Windows executable and available to the program as a Qt resource.
-file(GLOB TOOLBAR_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/toolbar/*.svg)
-file(GLOB DOCK_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/dock/*.svg)
-qt_add_resources(coldhex "app_icons"
-    PREFIX "/icons"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS} ${DOCK_ICONS}
-)
+# Icons, the style sheet and other resources are listed in resources/coldhex.qrc (also used by the
+# Designer for MainWindow.ui). The generated chip descriptions further below are added separately.
 if(WIN32)
     set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
     configure_file(resources/coldhex.rc.in ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc @ONLY)
@@ -295,4 +302,24 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_connectionadvice PRIVATE src)
     target_link_libraries(tst_connectionadvice PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_connectionadvice COMMAND tst_connectionadvice)
+
+    add_executable(tst_firmwarefiles
+        tests/tst_firmwarefiles.cpp
+        src/core/FirmwareFiles.cpp
+        src/core/FirmwareFiles.h
+        src/core/HexParser.cpp
+        src/core/HexParser.h
+    )
+    target_include_directories(tst_firmwarefiles PRIVATE src)
+    target_link_libraries(tst_firmwarefiles PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_firmwarefiles COMMAND tst_firmwarefiles)
+
+    add_executable(tst_theme
+        tests/tst_theme.cpp
+        src/ui/Theme.cpp
+        src/ui/Theme.h
+    )
+    target_include_directories(tst_theme PRIVATE src)
+    target_link_libraries(tst_theme PRIVATE Qt6::Widgets Qt6::Test)
+    add_test(NAME tst_theme COMMAND tst_theme)
 endif()
