@@ -116,9 +116,6 @@ docs/           Architecture, UI guide, test checklist, roadmap
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the layers fit together and
 [docs/UI.md](docs/UI.md) for what to change where in the interface.
 
-
-flashing back-end can be exchanged or mocked in tests.
-
 ## Testing
 
 `ctest` runs the automated tests. Before a release, also work through the
