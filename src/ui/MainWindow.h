@@ -26,6 +26,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void changeEvent(QEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
 
@@ -39,6 +40,7 @@ private slots:
     void onResetTargetTriggered();
     void onOpenHexTriggered();
     void onRefreshProbesTriggered();
+    void onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error);
 
     // Settings Panel Controls
     void onManufacturerChanged(const QString& manufacturer);
@@ -112,6 +114,9 @@ private:
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
+    bool m_probeRefreshVerbose = false;
+    bool m_lastProbeError = false;
+    QStringList m_lastProbeKeys;
     QString m_pendingReadFile;       // set while a memory read is running
     uint32_t m_pendingReadBase = 0;
 };

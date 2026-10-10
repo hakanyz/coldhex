@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QEvent>
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -46,6 +47,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
     connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
+    connect(m_engine, &ProbeRsEngine::probeListReady, this, &MainWindow::onProbeListReady);
     connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
@@ -424,31 +426,62 @@ void MainWindow::updateUiState() {
 }
 
 void MainWindow::onRefreshProbesTriggered() {
-    const QString previous = ui->comboProbe->currentText();
-    const auto probes = m_engine->listAvailableProbes();
+    m_probeRefreshVerbose = true;  // the user asked for it: always report the result
+    m_engine->requestProbeList();
+}
 
+// Fills the probe box with what probe-rs found. Automatic refreshes only write to the log when
+// the set of probes changed; a manual refresh always does.
+void MainWindow::onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error) {
+    const bool verbose = m_probeRefreshVerbose;
+    m_probeRefreshVerbose = false;
+
+    if (!success) {
+        if (verbose || !m_lastProbeError) appendLog("ERROR", error, "#ff5555");
+        m_lastProbeError = true;
+        return;
+    }
+    m_lastProbeError = false;
+
+    QStringList keys;
+    for (const ProbeInfo& p : probes) keys << p.selector();
+    const bool changed = (keys != m_lastProbeKeys);
+    m_lastProbeKeys = keys;
+
+    const QString previous = ui->comboProbe->currentText();
     ui->comboProbe->clear();
     if (probes.isEmpty()) {
         // Empty data means "let probe-rs pick"; connecting will report the real error.
         ui->comboProbe->addItem("(no probe detected)", QString());
-        appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
+        if (verbose || changed) {
+            appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
+        }
         return;
     }
 
     for (const auto& p : probes) {
         const QString label = p.displayName + " [" + p.selector() + "]";
         ui->comboProbe->addItem(label, p.selector());
-        appendLog("INFO", QString("Found probe: %1").arg(label));
+        if (verbose || changed) appendLog("INFO", QString("Found probe: %1").arg(label));
     }
     int idx = ui->comboProbe->findText(previous);
     if (idx >= 0) ui->comboProbe->setCurrentIndex(idx);
 
-    if (probes.size() > 1) {
+    if (probes.size() > 1 && (verbose || changed)) {
         const QString msg = QString("%1 probes found. Using: %2. Check the Probe selection before flashing.")
                                 .arg(probes.size())
                                 .arg(ui->comboProbe->currentText());
         appendLog("WARNING", msg, "#ffb86c");
         ui->statusBar->showMessage(msg, 8000);
+    }
+}
+
+// Probes are plugged in while the program runs: look again whenever the window is activated.
+void MainWindow::changeEvent(QEvent* event) {
+    QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::ActivationChange && isActiveWindow()
+        && !m_isOperationRunning && !m_engine->isBusy()) {
+        m_engine->requestProbeList();
     }
 }
 
