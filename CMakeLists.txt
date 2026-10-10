@@ -33,6 +33,8 @@ set(SOURCES
     src/core/SlotValidator.cpp
     src/core/ChipCatalog.h
     src/core/ChipCatalog.cpp
+    src/core/FirmwareFiles.h
+    src/core/FirmwareFiles.cpp
     src/engine/ChipDescription.h
     src/engine/ChipDescription.cpp
     src/engine/BundledChips.h
@@ -50,6 +52,8 @@ set(SOURCES
     src/ui/ChipSelector.cpp
     src/ui/ProbeSelector.h
     src/ui/ProbeSelector.cpp
+    src/ui/HelpDialogs.h
+    src/ui/HelpDialogs.cpp
     src/ui/SystemCheckDialog.cpp
     src/ui/Theme.h
     src/ui/Theme.cpp
@@ -308,4 +312,15 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_connectionadvice PRIVATE src)
     target_link_libraries(tst_connectionadvice PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_connectionadvice COMMAND tst_connectionadvice)
+
+    add_executable(tst_firmwarefiles
+        tests/tst_firmwarefiles.cpp
+        src/core/FirmwareFiles.cpp
+        src/core/FirmwareFiles.h
+        src/core/HexParser.cpp
+        src/core/HexParser.h
+    )
+    target_include_directories(tst_firmwarefiles PRIVATE src)
+    target_link_libraries(tst_firmwarefiles PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_firmwarefiles COMMAND tst_firmwarefiles)
 endif()

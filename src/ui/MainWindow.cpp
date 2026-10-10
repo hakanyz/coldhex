@@ -12,13 +12,12 @@
 #include <QMenu>
 #include <QKeySequence>
 #include <QDialog>
-#include <QDialogButtonBox>
-#include <QTextBrowser>
-#include <QVBoxLayout>
 #include <QPushButton>
 #include <QIcon>
 #include <QEvent>
 #include <QApplication>
+#include "core/FirmwareFiles.h"
+#include "HelpDialogs.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
@@ -750,25 +749,10 @@ void MainWindow::onReadTargetTriggered() {
     m_engine->readMemory(flash->start, flash->size, file);
 }
 
-namespace {
-
-bool isFirmwareFile(const QString& path) {
-    const FileFormat format = HexParser::detectFormat(path);
-    return format == FileFormat::IntelHex || format == FileFormat::RawBinary || format == FileFormat::Elf;
-}
-
-// Names that usually belong to a bootloader: boot.hex, my_bootloader.bin, app_bl.elf ...
-bool looksLikeBootloader(const QString& path) {
-    const QString name = QFileInfo(path).completeBaseName().toLower();
-    return name.contains("boot") || name.endsWith("_bl") || name.startsWith("bl_") || name == "bl";
-}
-
-}  // namespace
-
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
     if (!event->mimeData()->hasUrls()) return;
     for (const QUrl& url : event->mimeData()->urls()) {
-        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) {
+        if (url.isLocalFile() && FirmwareFiles::isFirmwareFile(url.toLocalFile())) {
             event->acceptProposedAction();
             return;
         }
@@ -777,80 +761,38 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
 
 // Dropped firmware files go to the slots: bootloader-like names to Slot 1, everything else to
 // Slot 2. Two files without such a name fill Slot 1 and Slot 2 in the order they were dropped.
-void MainWindow::dropEvent(QDropEvent* event) {
-    QStringList files;
-    for (const QUrl& url : event->mimeData()->urls()) {
-        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) files << url.toLocalFile();
-    }
-    if (files.isEmpty()) return;
-
-    const bool twoPlainFiles = files.size() == 2 && !looksLikeBootloader(files[0]) && !looksLikeBootloader(files[1]);
-    for (int i = 0; i < files.size() && i < 2; ++i) {
-        const QString& file = files[i];
-        const bool toSlot1 = twoPlainFiles ? (i == 0) : looksLikeBootloader(file);
-        QLineEdit* edit = toSlot1 ? ui->editSlot1Path : ui->editSlot2Path;
-        QCheckBox* check = toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled;
-        edit->setText(file);
-        check->setChecked(true);
-        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(file).fileName(), toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
-    }
-    if (files.size() > 2) appendLog("WARNING", "Only the first two dropped files were used.");
-    event->acceptProposedAction();
-}
-
-void MainWindow::onAboutTriggered() {
-    QMessageBox::about(this, "About ColdHex",
-        QString("<h3>ColdHex %1</h3>"
-                "<p>Flash and manage ARM Cortex-M microcontrollers through ST-Link, J-Link and CMSIS-DAP probes. "
-                "Flashing is done by <a href='https://probe.rs'>probe-rs</a>.</p>"
-                "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
-            .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
-}
-
 // Asks probe-rs for the probe list now and once more shortly after: right after a probe is
 // plugged in, the driver may not be ready yet.
-
-void MainWindow::onWiringGuideTriggered() {
-    auto* dialog = new QDialog(this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle("Wiring Guide");
-    dialog->resize(560, 520);
-
-    auto* view = new QTextBrowser(dialog);
-    view->setOpenExternalLinks(true);
-    view->setHtml(
-        "<h3>Connecting the probe to the target board</h3>"
-        "<p>Pin positions differ between probes and boards. Follow the pin labels of your probe and "
-        "your board; this guide only explains what each signal is for.</p>"
-        "<h4>SWD (2 wires + ground)</h4>"
-        "<table cellpadding='4' border='0'>"
-        "<tr><td><b>GND</b></td><td>Common ground. <b>Always connect it</b>, an unconnected ground is the most common cause of failures.</td></tr>"
-        "<tr><td><b>SWDIO</b></td><td>Bidirectional data line. Goes to the SWDIO pin of the chip.</td></tr>"
-        "<tr><td><b>SWCLK</b></td><td>Clock. Goes to the SWCLK pin of the chip. SWDIO and SWCLK are easy to swap.</td></tr>"
-        "<tr><td><b>3V3 / VTref</b></td><td>Tells the probe the voltage of the target. Many probes only measure it; the board needs its own power.</td></tr>"
-        "<tr><td><b>NRST</b></td><td>Optional reset line. Needed for <i>Connect under reset</i> and helps with chips that disable their debug pins.</td></tr>"
-        "</table>"
-        "<h4>JTAG</h4>"
-        "<p>TMS, TCK, TDI and TDO instead of SWDIO and SWCLK, plus GND, VTref and optionally NRST/TRST.</p>"
-        "<h4>If Connect fails</h4>"
-        "<ul>"
-        "<li>Check GND first, then swap SWDIO and SWCLK if unsure.</li>"
-        "<li>Make sure the board is powered and uses the same voltage level as the probe (3.3 V).</li>"
-        "<li>Keep the wires short; with long wires lower the speed (e.g. 500 kHz).</li>"
-        "<li>Try <i>Connect under reset</i> and connect NRST.</li>"
-        "<li>Check that the right chip and interface (SWD/JTAG) are selected.</li>"
-        "</ul>"
-        "<p>With a probe that works but a board that does not answer, ColdHex reports that the target "
-        "does not respond. That points to wiring, power or chip settings, not to the probe.</p>");
-
-    auto* layout = new QVBoxLayout(dialog);
-    layout->addWidget(view);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
-    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
-    layout->addWidget(buttons);
-    dialog->open();
-}
 
 // A slim title bar for the console with two small buttons: minimize (keeps only the bar, click
 // again to restore) and close (hides the console until the next action reopens it).
 // A closed console opens again when the user starts something. A minimized one stays small.
+void MainWindow::onAboutTriggered() {
+    HelpDialogs::showAbout(this);
+}
+
+void MainWindow::onWiringGuideTriggered() {
+    HelpDialogs::showWiringGuide(this);
+}
+
+// Dropped firmware files go to the slots (see FirmwareFiles::assignDroppedFiles).
+void MainWindow::dropEvent(QDropEvent* event) {
+    QStringList files;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile()) files << url.toLocalFile();
+    }
+
+    bool ignoredExtra = false;
+    const auto assignments = FirmwareFiles::assignDroppedFiles(files, &ignoredExtra);
+    if (assignments.isEmpty()) return;
+
+    for (const auto& a : assignments) {
+        const bool toSlot1 = (a.slot == 1);
+        (toSlot1 ? ui->editSlot1Path : ui->editSlot2Path)->setText(a.file);
+        (toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled)->setChecked(true);
+        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(a.file).fileName(),
+                                                   toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
+    }
+    if (ignoredExtra) appendLog("WARNING", "Only the first two dropped files were used.");
+    event->acceptProposedAction();
+}
