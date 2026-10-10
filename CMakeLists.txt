@@ -73,14 +73,75 @@ set_target_properties(probedesk PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-include(GNUInstallDirs)
-install(TARGETS probedesk
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-
 qt_finalize_executable(probedesk)
+
+# ---------------------------------------------------------------------------
+# Installation and packaging
+# ---------------------------------------------------------------------------
+# A probe-rs executable can be shipped inside the package. Point this at a folder that
+# contains it (probe-rs or probe-rs.exe); the packaging workflow downloads it for you.
+set(PROBEDESK_PROBE_RS_DIR "" CACHE PATH "Folder containing the probe-rs executable to ship with the package")
+
+include(GNUInstallDirs)
+if(WIN32)
+    # Qt's deploy script puts the Qt DLLs in bin/, so the program lives there too.
+    install(TARGETS probedesk RUNTIME DESTINATION bin)
+    # Copies the Qt DLLs and plugins next to the program when the package is built.
+    if(COMMAND qt_generate_deploy_app_script)
+        qt_generate_deploy_app_script(TARGET probedesk OUTPUT_SCRIPT PROBEDESK_DEPLOY_SCRIPT NO_UNSUPPORTED_PLATFORM_ERROR)
+        install(SCRIPT ${PROBEDESK_DEPLOY_SCRIPT})
+    endif()
+    set(PROBEDESK_PROBE_RS_DEST "bin")
+    set(PROBEDESK_NOTICE_DEST ".")
+else()
+    install(TARGETS probedesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES packaging/linux/probedesk.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/linux/69-probedesk.rules DESTINATION lib/udev/rules.d)
+    # The program looks for probe-rs in ../lib/probedesk relative to its own folder.
+    set(PROBEDESK_PROBE_RS_DEST "lib/probedesk")
+    set(PROBEDESK_NOTICE_DEST "share/doc/probedesk")
+endif()
+install(FILES packaging/THIRD_PARTY_NOTICES.md DESTINATION ${PROBEDESK_NOTICE_DEST})
+
+if(PROBEDESK_PROBE_RS_DIR)
+    find_program(PROBEDESK_PROBE_RS_EXE NAMES probe-rs PATHS "${PROBEDESK_PROBE_RS_DIR}" NO_DEFAULT_PATH REQUIRED)
+    install(PROGRAMS "${PROBEDESK_PROBE_RS_EXE}" DESTINATION ${PROBEDESK_PROBE_RS_DEST})
+    foreach(license LICENSE-MIT LICENSE-APACHE)
+        if(EXISTS "${PROBEDESK_PROBE_RS_DIR}/${license}")
+            install(FILES "${PROBEDESK_PROBE_RS_DIR}/${license}" DESTINATION ${PROBEDESK_NOTICE_DEST}
+                    RENAME "probe-rs-${license}")
+        endif()
+    endforeach()
+endif()
+
+set(CPACK_PACKAGE_NAME "probedesk")
+set(CPACK_PACKAGE_VENDOR "ProbeDesk Project")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Flash and manage ARM Cortex-M microcontrollers")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_EXECUTABLES "probedesk;ProbeDesk")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "ProbeDesk")
+
+if(WIN32)
+    # .zip (portable) and .exe (installer)
+    set(CPACK_GENERATOR "ZIP;NSIS")
+    set(CPACK_NSIS_DISPLAY_NAME "ProbeDesk")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "probedesk.exe")
+    set(CPACK_NSIS_MODIFY_PATH OFF)
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+else()
+    # .deb and .tar.gz
+    set(CPACK_GENERATOR "DEB;TGZ")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ProbeDesk Project")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postrm")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+endif()
+include(CPack)
+
 
 option(PROBEDESK_BUILD_TESTS "Build unit tests" ON)
 if(PROBEDESK_BUILD_TESTS)

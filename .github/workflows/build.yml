@@ -1,0 +1,147 @@
+name: Build and package
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PROBE_RS_VERSION: "0.32.0"
+  QT_VERSION: "6.8.3"
+
+jobs:
+  windows:
+    name: Windows (.zip, .exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          tools: tools_mingw1310
+          cache: true
+
+      - name: Put MinGW on PATH
+        shell: bash
+        run: echo "$IQTA_TOOLS/mingw1310_64/bin" >> "$GITHUB_PATH"
+
+      - name: Download probe-rs
+        shell: bash
+        run: |
+          base="https://github.com/probe-rs/probe-rs/releases/download/v${PROBE_RS_VERSION}"
+          file="probe-rs-tools-x86_64-pc-windows-msvc.zip"
+          mkdir -p third_party/probe-rs
+          curl -sSL -o "$file" "$base/$file"
+          curl -sSL -o "$file.sha256" "$base/$file.sha256"
+          expected=$(cut -d' ' -f1 "$file.sha256")
+          actual=$(sha256sum "$file" | cut -d' ' -f1)
+          [ "$expected" = "$actual" ] || { echo "probe-rs checksum mismatch"; exit 1; }
+          unzip -q -j "$file" probe-rs.exe LICENSE-MIT LICENSE-APACHE -d third_party/probe-rs
+          ls -la third_party/probe-rs
+
+      - name: Configure
+        shell: bash
+        run: >
+          cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+          -DPROBEDESK_PROBE_RS_DIR="$PWD/third_party/probe-rs"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Package (.zip and .exe)
+        shell: bash
+        run: |
+          export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          cd build
+          cpack -G "ZIP;NSIS"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-packages
+          path: |
+            build/probedesk-*.zip
+            build/probedesk-*.exe
+
+  linux:
+    name: Ubuntu 22.04 (.deb, .tar.gz)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools and Qt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libudev1
+
+      - name: Download probe-rs
+        run: |
+          base="https://github.com/probe-rs/probe-rs/releases/download/v${PROBE_RS_VERSION}"
+          file="probe-rs-tools-x86_64-unknown-linux-gnu.tar.xz"
+          mkdir -p third_party/probe-rs
+          curl -sSL -o "$file" "$base/$file"
+          curl -sSL -o "$file.sha256" "$base/$file.sha256"
+          expected=$(cut -d' ' -f1 "$file.sha256")
+          actual=$(sha256sum "$file" | cut -d' ' -f1)
+          [ "$expected" = "$actual" ] || { echo "probe-rs checksum mismatch"; exit 1; }
+          tar -xJf "$file" --strip-components=1 -C third_party/probe-rs --wildcards '*/probe-rs' '*/LICENSE-MIT' '*/LICENSE-APACHE'
+          chmod +x third_party/probe-rs/probe-rs
+          # Must run on Ubuntu 22.04, otherwise the package would be broken there.
+          third_party/probe-rs/probe-rs --version
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DPROBEDESK_PROBE_RS_DIR="$PWD/third_party/probe-rs"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Package (.deb and .tar.gz)
+        run: cd build && cpack -G "DEB;TGZ"
+
+      - name: Show package contents
+        run: |
+          dpkg-deb --info build/probedesk_*.deb
+          dpkg-deb --contents build/probedesk_*.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            build/probedesk_*.deb
+            build/probedesk-*.tar.gz
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: packages/*

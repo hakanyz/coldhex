@@ -28,6 +28,28 @@ The chips from that file then appear in the chip list (also under **Custom files
 
 To ship chips inside the executable instead, put the generated `.yaml` files in `resources/chips/` and re-run CMake; they are loaded on every start (see `resources/chips/README.md`).
 
+## Packages
+
+Pushing to GitHub runs `.github/workflows/build.yml`, which builds, tests and packages ProbeDesk:
+
+| Platform | Files |
+|---|---|
+| Windows | `probedesk-<version>-win64.zip` (portable), `probedesk-<version>-win64.exe` (installer) |
+| Ubuntu 22.04 | `probedesk_<version>_amd64.deb`, `probedesk-<version>-Linux.tar.gz` |
+
+Pushing a tag such as `v0.1.0` also attaches these files to a GitHub Release. probe-rs is downloaded
+by the workflow and shipped inside every package. The `.deb` additionally installs USB access
+rules so the probe can be used without root. On first start ProbeDesk checks probe-rs, the
+connected probes and their drivers (Help > System Check) and explains anything that is missing.
+
+To build a package locally, point CMake at a folder containing `probe-rs` and run CPack:
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPROBEDESK_PROBE_RS_DIR=<folder with probe-rs>
+cmake --build build
+cd build && cpack
+```
+
 ## Architecture Overview
 
 ```
