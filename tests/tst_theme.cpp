@@ -13,7 +13,7 @@ private slots:
         const Theme::Color last = Theme::Color::logSuccess;
         for (int i = static_cast<int>(first); i <= static_cast<int>(last); ++i) {
             const QString hex = Theme::hex(static_cast<Theme::Color>(i));
-            QVERIFY2(QColor::isValidColorName(hex), qPrintable(hex));
+            QVERIFY2(QColor(hex).isValid(), qPrintable(hex));  // isValidColorName needs Qt 6.4
             QVERIFY(hex.startsWith('#') && hex.size() == 7);
         }
     }
