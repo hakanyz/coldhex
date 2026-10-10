@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=ProbeDesk
+Comment=Flash and manage ARM Cortex-M microcontrollers
+Exec=probedesk
+Terminal=false
+Categories=Development;Electronics;

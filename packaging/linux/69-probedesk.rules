@@ -1,0 +1,11 @@
+# Lets the logged-in user access the debug probes ProbeDesk supports.
+# "uaccess" grants access to the user at the keyboard; no group membership is needed.
+
+# ST-Link (V1, V2, V2-1, V3)
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="3744|3748|374b|374d|374e|374f|3752|3753|3754|3757", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# SEGGER J-Link
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="1366", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# CMSIS-DAP / DAPLink
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0d28", ATTRS{idProduct}=="0204", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
