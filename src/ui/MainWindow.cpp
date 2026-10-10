@@ -2,8 +2,6 @@
 #include "ui_MainWindow.h"
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
-#include "engine/ChipDescription.h"
-#include "engine/BundledChips.h"
 #include "engine/ProbeRsLocator.h"
 #include "SystemCheckDialog.h"
 #include <QTimer>
@@ -14,19 +12,12 @@
 #include <QMenu>
 #include <QKeySequence>
 #include <QDialog>
-#include <QDialogButtonBox>
-#include <QTextBrowser>
-#include <QVBoxLayout>
 #include <QPushButton>
 #include <QIcon>
 #include <QEvent>
-#include "engine/UsbScanner.h"
-#ifdef Q_OS_WIN
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <dbt.h>
-#endif
 #include <QApplication>
+#include "core/FirmwareFiles.h"
+#include "HelpDialogs.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
@@ -34,9 +25,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
-#include <QCompleter>
 #include <QLineEdit>
-#include <QStringListModel>
 #include <QSettings>
 #include <QFileDialog>
 #include <QDateTime>
@@ -52,18 +41,21 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+    m_console = new ConsoleDock(this, ui->dockConsoleOutput, ui->textLog, ui->actionClearLog, ui->actionSaveLog);
+    m_chipSelector = new ChipSelector(this, ui->comboManufacturer, ui->comboModel, m_engine);
+    connect(m_chipSelector, &ChipSelector::message, this, &MainWindow::appendLog);
+    m_probeSelector = new ProbeSelector(this, ui->comboProbe, m_engine, [this]() { return m_isOperationRunning || m_engine->isBusy(); });
+    connect(m_probeSelector, &ProbeSelector::message, this, &MainWindow::appendLog);
+    connect(m_probeSelector, &ProbeSelector::status, ui->statusBar, &QStatusBar::showMessage);
     setAcceptDrops(true);
 
     setupUiCustomizations();
     setupToolBarWidgets();
-    setupDeviceDatabase();
 
     // Engine Signals
     connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
-    connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
-    connect(m_engine, &ProbeRsEngine::probeListReady, this, &MainWindow::onProbeListReady);
     connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
@@ -77,24 +69,21 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::onConnectTriggered);
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
     connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
-    connect(ui->actionSaveLog, &QAction::triggered, this, &MainWindow::onSaveLogTriggered);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
     connect(ui->actionResetTarget, &QAction::triggered, this, &MainWindow::onResetTargetTriggered);
     connect(ui->actionOpenHex, &QAction::triggered, this, &MainWindow::onOpenHexTriggered);
-    connect(ui->actionClearLog, &QAction::triggered, ui->textLog, &QPlainTextEdit::clear);
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
-    connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
-    connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
+    connect(ui->actionRefreshProbes, &QAction::triggered, this, [this]() { m_probeSelector->refresh(true); });
+    connect(ui->actionAddChipFile, &QAction::triggered, m_chipSelector, &ChipSelector::addChipFile);
     connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
     connect(ui->actionWiringGuide, &QAction::triggered, this, &MainWindow::onWiringGuideTriggered);
     connect(ui->actionCancel, &QAction::triggered, this, &MainWindow::onCancelTriggered);
-    connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
+    connect(ui->actionClearChipFiles, &QAction::triggered, m_chipSelector, &ChipSelector::clearChipFiles);
 
     // Settings Panel Controls
-    connect(ui->comboManufacturer, &QComboBox::currentTextChanged, this, &MainWindow::onManufacturerChanged);
     connect(ui->btnOpenSlot1, &QPushButton::clicked, this, &MainWindow::onOpenSlot1Clicked);
     connect(ui->btnOpenSlot2, &QPushButton::clicked, this, &MainWindow::onOpenSlot2Clicked);
     connect(ui->editSlot1Path, &QLineEdit::textChanged, this, &MainWindow::onSlot1PathChanged);
@@ -115,32 +104,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->lblMemoryMapTitle->setText(name.isEmpty() ? QString("Memory Map") : QString("Memory Map (%1) - Flash").arg(name));
     });
 
-    onRefreshProbesTriggered();
-
-    // Newly plugged-in probes: Windows tells the program about every USB change (nativeEvent),
-    // on Linux a cheap look at /sys/bus/usb every second does the same job. A slow timer stays
-    // as a safety net on both.
-    m_probeTimer = new QTimer(this);
-    connect(m_probeTimer, &QTimer::timeout, this, [this]() {
-#ifndef Q_OS_WIN
-        const QList<UsbDevice> seen = UsbScanner::scan();
-        QStringList keys;
-        for (const UsbDevice& d : seen) keys << d.id();
-        if (keys != m_lastUsbKeys) {
-            m_lastUsbKeys = keys;
-            scheduleProbeRefresh();
-            return;
-        }
-#endif
-        if (m_probeSafetyTick++ % 5 == 0) scheduleProbeRefresh();
-    });
-#ifdef Q_OS_WIN
-    m_probeTimer->start(5000);
-#else
-    m_probeTimer->start(1000);
-#endif
     restoreSettings();
-    m_engine->requestChipList();
+    m_chipSelector->requestChips();
 
     // After the window is up, check the setup and open the System Check only if something needs fixing.
     QTimer::singleShot(0, this, [this]() {
@@ -175,11 +140,8 @@ void MainWindow::restoreSettings() {
         if (idx >= 0) combo->setCurrentIndex(idx);
     };
 
-    m_pendingManufacturer = s.manufacturer;
-    m_pendingChip = s.chip;
-    m_customChipFiles = s.customChipFiles;
-    ui->comboModel->setEditText(s.chip);
-    selectIfPresent(ui->comboProbe, s.probe);
+    m_chipSelector->restore(s.manufacturer, s.chip, s.customChipFiles);
+    m_probeSelector->restore(s.probe);
     selectIfPresent(ui->comboInterface, s.interfaceName);
     ui->spinSpeed->setValue(qBound(ui->spinSpeed->minimum(), s.speedKhz, ui->spinSpeed->maximum()));
 
@@ -200,16 +162,16 @@ void MainWindow::restoreSettings() {
 
 void MainWindow::saveSettings() {
     UiSettings s;
-    s.manufacturer = ui->comboManufacturer->currentText();
-    s.chip = ui->comboModel->currentText();
-    s.probe = ui->comboProbe->currentText();
+    s.manufacturer = m_chipSelector->manufacturer();
+    s.chip = m_chipSelector->chipText();
+    s.probe = m_probeSelector->label();
     s.interfaceName = ui->comboInterface->currentText();
     s.speedKhz = ui->spinSpeed->value();
     s.slot1Path = ui->editSlot1Path->text();
     s.slot2Path = ui->editSlot2Path->text();
     s.slot1Address = ui->editSlot1Address->text();
     s.slot2Address = ui->editSlot2Address->text();
-    s.customChipFiles = m_customChipFiles;
+    s.customChipFiles = m_chipSelector->customChipFiles();
     s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
     s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
     s.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
@@ -239,57 +201,15 @@ void MainWindow::setupUiCustomizations() {
     ui->tableMemory->setFont(monoFont);
     ui->textLog->setFont(monoFont);
 
-    // DockWidget properties
-    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
-    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
-
-    ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
-    ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
-
-    // Toolbar: small icons with the label under them, and visible button states.
-    struct ActionIcon { QAction* action; const char* file; };
-    const ActionIcon icons[] = {
-        {ui->actionConnect, "connect"},   {ui->actionDisconnect, "disconnect"},
-        {ui->actionRead, "read"},         {ui->actionErase, "erase"},
-        {ui->actionProgram, "program"},   {ui->actionVerify, "verify"},
-        {ui->actionResetTarget, "reset"}, {ui->actionCancel, "stop"},
-        {ui->actionOpenHex, "open"},
-    };
-    for (const ActionIcon& a : icons) {
-        a.action->setIcon(QIcon(QString(":/icons/toolbar/%1.svg").arg(a.file)));
-    }
-    ui->mainToolBar->setIconSize(QSize(18, 18));
-    ui->mainToolBar->setStyleSheet(
-        "QToolButton { padding: 3px 8px; border: 1px solid transparent; border-radius: 4px; }"
-        "QToolButton:hover { background: #3a3d42; border-color: #4a4e55; }"
-        "QToolButton:pressed { background: #2a2c30; }"
-        "QToolButton:disabled { color: #6b6f76; }");
-
-    setupConsoleTitleBar();
-
-    // View menu: show or hide the side panel and the console (they can also be closed with their X).
-    QMenu* viewMenu = new QMenu("View", this);
+    // View menu (defined in the .ui file): show or hide the side panel and the console. They can
+    // also be closed with their X.
     QAction* toggleSettings = ui->dockTargetSettings->toggleViewAction();
     toggleSettings->setText("Target Settings");
     QAction* toggleConsole = ui->dockConsoleOutput->toggleViewAction();
     toggleConsole->setText("Console Output");
     toggleConsole->setShortcut(QKeySequence("F12"));
-    viewMenu->addAction(toggleSettings);
-    viewMenu->addAction(toggleConsole);
-    menuBar()->insertMenu(ui->menuHelp->menuAction(), viewMenu);
-
-    // Right-click in the console: Copy, Select All, Clear and Save. Ctrl+L clears it as well.
-    ui->textLog->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(ui->textLog, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
-        QMenu* menu = ui->textLog->createStandardContextMenu();
-        menu->addSeparator();
-        menu->addAction(ui->actionClearLog);
-        menu->addAction(ui->actionSaveLog);
-        menu->setAttribute(Qt::WA_DeleteOnClose);
-        menu->popup(ui->textLog->mapToGlobal(pos));
-    });
-    ui->actionClearLog->setShortcut(QKeySequence("Ctrl+L"));
-    ui->actionClearLog->setToolTip("Clear the console output (Ctrl+L)");
+    ui->menuView->addAction(toggleSettings);
+    ui->menuView->addAction(toggleConsole);
 
     ui->statusBar->showMessage("Ready");
 }
@@ -312,155 +232,17 @@ void MainWindow::setupToolBarWidgets() {
     });
 }
 
-void MainWindow::setupDeviceDatabase() {
-    // The chip list comes from the engine (see onChipListReady); until then the
-    // chip box stays a free-text field so a saved chip name is still usable.
-    ui->comboModel->setEditable(true);
-    ui->comboModel->setInsertPolicy(QComboBox::NoInsert);
-    // Typing searches every known chip, not only the manufacturer chosen above.
-    m_chipNames = new QStringListModel(this);
-    auto* completer = new QCompleter(m_chipNames, this);
-    completer->setFilterMode(Qt::MatchContains);
-    completer->setCaseSensitivity(Qt::CaseInsensitive);
-    completer->setCompletionMode(QCompleter::PopupCompletion);
-    completer->setMaxVisibleItems(15);
-    ui->comboModel->setCompleter(completer);
-    connect(completer, QOverload<const QString&>::of(&QCompleter::activated), this, &MainWindow::onChipTextCommitted);
-    connect(ui->comboModel->lineEdit(), &QLineEdit::editingFinished, this, &MainWindow::onChipTextCommitted);
-
-    // Interfaces
-    ui->comboInterface->addItems({"SWD", "JTAG"});
-    ui->comboInterface->setCurrentText("SWD");
-}
-
-void MainWindow::onManufacturerChanged(const QString& manufacturer) {
-    if (m_chips.isEmpty() || manufacturer.isEmpty()) return;
-
-    const QString current = ui->comboModel->currentText();
-    ui->comboModel->clear();
-    ui->comboModel->addItems(ChipCatalog::chipNames(m_chips, manufacturer));
-
-    // Keep the typed/selected chip if it belongs to this manufacturer, otherwise start empty.
-    int idx = ui->comboModel->findText(current, Qt::MatchFixedString);
-    if (idx >= 0) {
-        ui->comboModel->setCurrentIndex(idx);
-    } else {
-        ui->comboModel->setCurrentIndex(-1);
-        ui->comboModel->clearEditText();
-    }
-}
-
-void MainWindow::onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error) {
-    m_builtinChipsLoaded = success;
-    if (success) {
-        m_builtinChips = chips;
-        appendLog("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
-    } else {
-        m_builtinChips.clear();
-        appendLog("ERROR", QString("Chip list unavailable: %1").arg(error), "#ff5555");
-        appendLog("WARNING", "Chip names cannot be checked; type the exact probe-rs chip name.");
-    }
-    rebuildChipCatalog();
-}
-
-// Merges probe-rs' own chips with the ones from the user's chip description files and
-// refreshes the manufacturer and model boxes.
-void MainWindow::rebuildChipCatalog() {
-    m_chips = m_builtinChips;
-
-    // Chip descriptions built into the executable, then the ones the user added.
-    QStringList descriptionFiles = BundledChips::extract(":/chips",
-        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/chips");
-    for (const QString& path : m_customChipFiles) {
-        if (!descriptionFiles.contains(path)) descriptionFiles << path;
-    }
-
-    for (const QString& path : descriptionFiles) {
-        QString family;
-        QString error;
-        const QStringList names = ChipDescription::variantNamesFromFile(path, &family, &error);
-        if (names.isEmpty()) {
-            appendLog("ERROR", error, "#ff5555");
-            continue;
-        }
-        for (const QString& name : names) {
-            m_chips.append({"Chip file: " + family, name, path});
-        }
-        appendLog("INFO", QString("Chip description '%1': %2 chips (%3).")
-                              .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
-    }
-
-    QStringList allNames;
-    for (const ChipEntry& chip : m_chips) allNames << chip.name;
-    m_chipNames->setStringList(allNames);
-
-    if (m_chips.isEmpty()) {
-        ui->comboModel->setEditText(m_pendingChip);
-        return;
-    }
-
-    const QString wantedMaker = m_pendingManufacturer.isEmpty() ? ui->comboManufacturer->currentText() : m_pendingManufacturer;
-    ui->comboManufacturer->blockSignals(true);
-    ui->comboManufacturer->clear();
-    ui->comboManufacturer->addItems(ChipCatalog::manufacturers(m_chips));
-    int makerIdx = ui->comboManufacturer->findText(wantedMaker);
-    if (makerIdx < 0) makerIdx = ui->comboManufacturer->findText("STM32");
-    ui->comboManufacturer->setCurrentIndex(makerIdx >= 0 ? makerIdx : 0);
-    ui->comboManufacturer->blockSignals(false);
-
-    const QString wantedChip = m_pendingChip.isEmpty() ? ui->comboModel->currentText() : m_pendingChip;
-    ui->comboModel->setEditText(wantedChip);
-    onManufacturerChanged(ui->comboManufacturer->currentText());
-
-    QString canonical;
-    if (!wantedChip.isEmpty() && ChipCatalog::find(m_chips, wantedChip, &canonical)) {
-        ui->comboModel->setEditText(canonical);
-    }
-    m_pendingManufacturer.clear();
-    m_pendingChip.clear();
-}
-
-void MainWindow::onAddChipFileTriggered() {
-    const QString path = QFileDialog::getOpenFileName(this, "Add Chip Description File", "",
-                                                      "probe-rs chip description (*.yaml *.yml);;All Files (*.*)");
-    if (path.isEmpty()) return;
-
-    if (m_customChipFiles.contains(path)) {
-        appendLog("INFO", "That chip description file is already added.");
-        return;
-    }
-
-    QString family;
-    QString error;
-    if (ChipDescription::variantNamesFromFile(path, &family, &error).isEmpty()) {
-        appendLog("ERROR", error, "#ff5555");
-        QMessageBox::warning(this, "Invalid Chip Description", error);
-        return;
-    }
-
-    m_customChipFiles << path;
-    rebuildChipCatalog();
-}
-
-void MainWindow::onClearChipFilesTriggered() {
-    if (m_customChipFiles.isEmpty()) return;
-    m_customChipFiles.clear();
-    appendLog("INFO", "Custom chip description files removed.");
-    rebuildChipCatalog();
-}
-
 // Pushes the chip, speed and probe currently shown in the UI to the engine, so erase, reset
 // and program never run with stale or empty settings.
 bool MainWindow::prepareEngine() {
     QString chip;
-    if (!resolveChip(chip)) return false;
+    if (!m_chipSelector->resolve(chip)) return false;
 
-    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
-    const QString descriptionFile = entry ? entry->descriptionFile : QString();
+    const QString descriptionFile = m_chipSelector->descriptionFileFor(chip);
     TargetSettings target;
     target.chipName = chip;
     target.speedKhz = ui->spinSpeed->value();
-    target.probeId = ui->comboProbe->currentData().toString();
+    target.probeId = m_probeSelector->selector();
     target.chipDescriptionPath = descriptionFile;
     target.protocol = (ui->comboInterface->currentText() == "JTAG") ? DebugProtocol::Jtag : DebugProtocol::Swd;
     target.connectUnderReset = ui->checkConnectUnderReset->isChecked();
@@ -469,39 +251,8 @@ bool MainWindow::prepareEngine() {
 }
 
 // Returns false (after telling the user) when the chip name is not known to probe-rs.
-bool MainWindow::resolveChip(QString& chip) {
-    chip = ui->comboModel->currentText().trimmed();
-    if (chip.isEmpty()) {
-        QMessageBox::warning(this, "No Chip Selected", "Please select or type a target chip.");
-        return false;
-    }
-
-    QString canonical;
-    if (ChipCatalog::find(m_chips, chip, &canonical)) {
-        chip = canonical;
-        return true;
-    }
-
-    // Without probe-rs' own list a typed name cannot be checked; let probe-rs judge it.
-    if (!m_builtinChipsLoaded) return true;
-
-    const QString msg = QString("'%1' is not a chip name known to probe-rs. Pick one from the list.").arg(chip);
-    appendLog("ERROR", msg, "#ff5555");
-    QMessageBox::warning(this, "Unknown Chip", msg);
-    return false;
-}
-
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
-    QString timeStr = QDateTime::currentDateTime().toString("HH:mm:ss");
-    QString formatted = QString("<span style='color: #888888;'>[%1]</span> <span style='color: %2; font-weight: bold;'>%3:</span> <span style='color: #dcdcdc;'>%4</span>")
-                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped().replace("\n", "<br>"));
-    ui->textLog->appendHtml(formatted);
-
-    // A minimized console cannot be read: flag problems on its small title bar.
-    if (m_consoleMinimized && m_consoleTitle && (levelStr == "ERROR" || levelStr == "WARNING" || levelStr == "WARN")) {
-        m_consoleTitle->setText("Console Output  ●");
-        m_consoleTitle->setStyleSheet("font-weight: bold; color: #e5645a;");
-    }
+    m_console->append(levelStr, message, colorHex);
 }
 
 void MainWindow::updateUiState() {
@@ -516,74 +267,15 @@ void MainWindow::updateUiState() {
     ui->actionCancel->setEnabled(busy);
 }
 
-void MainWindow::onRefreshProbesTriggered() {
-    m_probeRefreshVerbose = true;  // the user asked for it: always report the result
-    m_engine->requestProbeList();
-}
-
 // Fills the probe box with what probe-rs found. Automatic refreshes only write to the log when
 // the set of probes changed; a manual refresh always does.
-void MainWindow::onProbeListReady(bool success, const QList<ProbeInfo>& probes, const QString& error) {
-    const bool verbose = m_probeRefreshVerbose;
-    m_probeRefreshVerbose = false;
-
-    if (!success) {
-        if (verbose || !m_lastProbeError) appendLog("ERROR", error, "#ff5555");
-        m_lastProbeError = true;
-        return;
-    }
-    m_lastProbeError = false;
-
-    QStringList keys;
-    for (const ProbeInfo& p : probes) keys << p.selector();
-    const bool changed = !m_probeListSeen || (keys != m_lastProbeKeys);
-    m_probeListSeen = true;
-    m_lastProbeKeys = keys;
-    if (!changed && !verbose) return;  // leave the box alone, an open drop-down would close
-
-    const QString previous = ui->comboProbe->currentText();
-    ui->comboProbe->clear();
-    if (probes.isEmpty()) {
-        // Empty data means "let probe-rs pick"; connecting will report the real error.
-        ui->comboProbe->addItem("(no probe detected)", QString());
-        if (verbose || changed) {
-            appendLog("WARNING", "No debug probe detected. Check the USB connection, the probe driver and that probe-rs is installed.");
-        }
-        return;
-    }
-
-    for (const auto& p : probes) {
-        const QString label = p.displayName + " [" + p.selector() + "]";
-        ui->comboProbe->addItem(label, p.selector());
-        if (verbose || changed) appendLog("INFO", QString("Found probe: %1").arg(label));
-    }
-    int idx = ui->comboProbe->findText(previous);
-    if (idx >= 0) ui->comboProbe->setCurrentIndex(idx);
-
-    if (probes.size() > 1 && (verbose || changed)) {
-        const QString msg = QString("%1 probes found. Using: %2. Check the Probe selection before flashing.")
-                                .arg(probes.size())
-                                .arg(ui->comboProbe->currentText());
-        appendLog("WARNING", msg, "#ffb86c");
-        ui->statusBar->showMessage(msg, 8000);
-    }
-}
-
 // Probes are plugged in while the program runs: look again whenever the window is activated.
-void MainWindow::changeEvent(QEvent* event) {
-    QMainWindow::changeEvent(event);
-    if (event->type() == QEvent::ActivationChange && isActiveWindow()
-        && !m_isOperationRunning && !m_engine->isBusy()) {
-        m_engine->requestProbeList();
-    }
-}
-
 void MainWindow::onConnectTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
-    const QString chip = ui->comboModel->currentText().trimmed();
+    const QString chip = m_chipSelector->chipText();
     const uint32_t speed = ui->spinSpeed->value();
-    const QString probe = ui->comboProbe->currentData().toString();
+    const QString probe = m_probeSelector->selector();
 
     m_manualConnect = true;
     m_isOperationRunning = true;
@@ -597,7 +289,7 @@ void MainWindow::onDisconnectTriggered() {
 }
 
 void MainWindow::onEraseTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (QMessageBox::question(this, "Confirm Erase",
             "Are you sure you want to completely erase the target chip flash?",
             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
@@ -613,9 +305,9 @@ void MainWindow::onEraseTriggered() {
 // Collects target settings and both slots from the UI and checks them. Returns false (after
 // telling the user why) when the run must not start.
 bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2) {
-    if (!resolveChip(cfg.chipName)) return false;
+    if (!m_chipSelector->resolve(cfg.chipName)) return false;
     cfg.speedKhz = ui->spinSpeed->value();
-    cfg.probeId = ui->comboProbe->currentData().toString();
+    cfg.probeId = m_probeSelector->selector();
     cfg.autoSpeedEnabled = true;
     cfg.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
     cfg.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
@@ -642,8 +334,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
     if (!prepareEngine()) return false;
 
     // Refuse to write outside the chip's flash. Skipped when the memory layout is unknown.
-    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, cfg.chipName);
-    const ChipMemoryMap memory = m_engine->queryMemoryMap(cfg.chipName, entry ? entry->descriptionFile : QString());
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(cfg.chipName, m_chipSelector->descriptionFileFor(cfg.chipName));
     if (memory.isValid()) {
         struct SlotCheck { const FirmwareSlot* slot; const AddressRange* range; };
         for (const SlotCheck& c : {SlotCheck{&s1, &range1}, SlotCheck{&s2, &range2}}) {
@@ -672,7 +363,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
 }
 
 void MainWindow::onProgramTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -686,7 +377,7 @@ void MainWindow::onProgramTriggered() {
 }
 
 void MainWindow::onVerifyTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -749,7 +440,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
 }
 
 void MainWindow::onResetTargetTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
     m_engine->resetTarget(false);
 }
@@ -955,24 +646,6 @@ void MainWindow::onSystemCheckTriggered() {
 
 // After a chip was picked or typed: if it belongs to another manufacturer than the one
 // shown, switch the manufacturer box so the two always agree.
-void MainWindow::onChipTextCommitted() {
-    QTimer::singleShot(0, this, [this]() {
-        QString canonical;
-        if (!ChipCatalog::find(m_chips, ui->comboModel->currentText(), &canonical)) return;
-
-        const QString shown = ui->comboManufacturer->currentText();
-        if (ChipCatalog::chipNames(m_chips, shown).contains(canonical)) {
-            ui->comboModel->setEditText(canonical);
-            return;
-        }
-
-        const QString maker = ChipCatalog::manufacturerOf(m_chips, canonical);
-        const int idx = ui->comboManufacturer->findText(maker.isEmpty() ? ChipCatalog::allChipsLabel() : maker);
-        if (idx >= 0) ui->comboManufacturer->setCurrentIndex(idx);  // keeps the chip name
-        ui->comboModel->setEditText(canonical);
-    });
-}
-
 void MainWindow::onCancelTriggered() {
     appendLog("WARNING", "Stopping the running operation...", "#e67e22");
     if (m_sequenceRunning) {
@@ -1013,12 +686,11 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
 }
 
 void MainWindow::onReadTargetTriggered() {
-    ensureConsoleVisible();
+    m_console->ensureVisible();
     if (!prepareEngine()) return;
 
-    const QString chip = ui->comboModel->currentText().trimmed();
-    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
-    const ChipMemoryMap memory = m_engine->queryMemoryMap(chip, entry ? entry->descriptionFile : QString());
+    const QString chip = m_chipSelector->chipText();
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(chip, m_chipSelector->descriptionFileFor(chip));
     const MemoryRegion* flash = memory.mainFlash();
     if (!flash) {
         const QString msg = "The flash size of this chip is unknown, so the whole flash cannot be read.";
@@ -1042,40 +714,10 @@ void MainWindow::onReadTargetTriggered() {
     m_engine->readMemory(flash->start, flash->size, file);
 }
 
-void MainWindow::onSaveLogTriggered() {
-    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
-                                  .filePath("coldhex-log.txt");
-    const QString file = QFileDialog::getSaveFileName(this, "Save Log", suggested, "Text (*.txt);;All Files (*.*)");
-    if (file.isEmpty()) return;
-
-    QFile out(file);
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "Save Log", "Cannot write to " + file);
-        return;
-    }
-    out.write(ui->textLog->toPlainText().toUtf8());
-    appendLog("INFO", "Log saved to " + file);
-}
-
-namespace {
-
-bool isFirmwareFile(const QString& path) {
-    const FileFormat format = HexParser::detectFormat(path);
-    return format == FileFormat::IntelHex || format == FileFormat::RawBinary || format == FileFormat::Elf;
-}
-
-// Names that usually belong to a bootloader: boot.hex, my_bootloader.bin, app_bl.elf ...
-bool looksLikeBootloader(const QString& path) {
-    const QString name = QFileInfo(path).completeBaseName().toLower();
-    return name.contains("boot") || name.endsWith("_bl") || name.startsWith("bl_") || name == "bl";
-}
-
-}  // namespace
-
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
     if (!event->mimeData()->hasUrls()) return;
     for (const QUrl& url : event->mimeData()->urls()) {
-        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) {
+        if (url.isLocalFile() && FirmwareFiles::isFirmwareFile(url.toLocalFile())) {
             event->acceptProposedAction();
             return;
         }
@@ -1084,166 +726,38 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
 
 // Dropped firmware files go to the slots: bootloader-like names to Slot 1, everything else to
 // Slot 2. Two files without such a name fill Slot 1 and Slot 2 in the order they were dropped.
-void MainWindow::dropEvent(QDropEvent* event) {
-    QStringList files;
-    for (const QUrl& url : event->mimeData()->urls()) {
-        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) files << url.toLocalFile();
-    }
-    if (files.isEmpty()) return;
-
-    const bool twoPlainFiles = files.size() == 2 && !looksLikeBootloader(files[0]) && !looksLikeBootloader(files[1]);
-    for (int i = 0; i < files.size() && i < 2; ++i) {
-        const QString& file = files[i];
-        const bool toSlot1 = twoPlainFiles ? (i == 0) : looksLikeBootloader(file);
-        QLineEdit* edit = toSlot1 ? ui->editSlot1Path : ui->editSlot2Path;
-        QCheckBox* check = toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled;
-        edit->setText(file);
-        check->setChecked(true);
-        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(file).fileName(), toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
-    }
-    if (files.size() > 2) appendLog("WARNING", "Only the first two dropped files were used.");
-    event->acceptProposedAction();
-}
-
-void MainWindow::onAboutTriggered() {
-    QMessageBox::about(this, "About ColdHex",
-        QString("<h3>ColdHex %1</h3>"
-                "<p>Flash and manage ARM Cortex-M microcontrollers through ST-Link, J-Link and CMSIS-DAP probes. "
-                "Flashing is done by <a href='https://probe.rs'>probe-rs</a>.</p>"
-                "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
-            .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
-}
-
 // Asks probe-rs for the probe list now and once more shortly after: right after a probe is
 // plugged in, the driver may not be ready yet.
-void MainWindow::scheduleProbeRefresh() {
-    auto refresh = [this]() {
-        if (!m_isOperationRunning && !m_engine->isBusy()) m_engine->requestProbeList();
-    };
-    QTimer::singleShot(300, this, refresh);
-    QTimer::singleShot(1500, this, refresh);
-}
-
-#ifdef Q_OS_WIN
-bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
-    if (eventType == "windows_generic_MSG") {
-        const MSG* msg = static_cast<const MSG*>(message);
-        // Any device arriving, leaving or changing: look at the probes again.
-        if (msg->message == WM_DEVICECHANGE
-            && (msg->wParam == DBT_DEVNODES_CHANGED || msg->wParam == DBT_DEVICEARRIVAL
-                || msg->wParam == DBT_DEVICEREMOVECOMPLETE)) {
-            scheduleProbeRefresh();
-        }
-    }
-    return QMainWindow::nativeEvent(eventType, message, result);
-}
-#endif
-
-void MainWindow::onWiringGuideTriggered() {
-    auto* dialog = new QDialog(this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle("Wiring Guide");
-    dialog->resize(560, 520);
-
-    auto* view = new QTextBrowser(dialog);
-    view->setOpenExternalLinks(true);
-    view->setHtml(
-        "<h3>Connecting the probe to the target board</h3>"
-        "<p>Pin positions differ between probes and boards. Follow the pin labels of your probe and "
-        "your board; this guide only explains what each signal is for.</p>"
-        "<h4>SWD (2 wires + ground)</h4>"
-        "<table cellpadding='4' border='0'>"
-        "<tr><td><b>GND</b></td><td>Common ground. <b>Always connect it</b>, an unconnected ground is the most common cause of failures.</td></tr>"
-        "<tr><td><b>SWDIO</b></td><td>Bidirectional data line. Goes to the SWDIO pin of the chip.</td></tr>"
-        "<tr><td><b>SWCLK</b></td><td>Clock. Goes to the SWCLK pin of the chip. SWDIO and SWCLK are easy to swap.</td></tr>"
-        "<tr><td><b>3V3 / VTref</b></td><td>Tells the probe the voltage of the target. Many probes only measure it; the board needs its own power.</td></tr>"
-        "<tr><td><b>NRST</b></td><td>Optional reset line. Needed for <i>Connect under reset</i> and helps with chips that disable their debug pins.</td></tr>"
-        "</table>"
-        "<h4>JTAG</h4>"
-        "<p>TMS, TCK, TDI and TDO instead of SWDIO and SWCLK, plus GND, VTref and optionally NRST/TRST.</p>"
-        "<h4>If Connect fails</h4>"
-        "<ul>"
-        "<li>Check GND first, then swap SWDIO and SWCLK if unsure.</li>"
-        "<li>Make sure the board is powered and uses the same voltage level as the probe (3.3 V).</li>"
-        "<li>Keep the wires short; with long wires lower the speed (e.g. 500 kHz).</li>"
-        "<li>Try <i>Connect under reset</i> and connect NRST.</li>"
-        "<li>Check that the right chip and interface (SWD/JTAG) are selected.</li>"
-        "</ul>"
-        "<p>With a probe that works but a board that does not answer, ColdHex reports that the target "
-        "does not respond. That points to wiring, power or chip settings, not to the probe.</p>");
-
-    auto* layout = new QVBoxLayout(dialog);
-    layout->addWidget(view);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
-    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
-    layout->addWidget(buttons);
-    dialog->open();
-}
 
 // A slim title bar for the console with two small buttons: minimize (keeps only the bar, click
 // again to restore) and close (hides the console until the next action reopens it).
-void MainWindow::setupConsoleTitleBar() {
-    auto* bar = new QWidget(ui->dockConsoleOutput);
-    auto* layout = new QHBoxLayout(bar);
-    layout->setContentsMargins(8, 2, 4, 2);
-    layout->setSpacing(2);
-
-    m_consoleTitle = new QLabel("Console Output", bar);
-    m_consoleTitle->setStyleSheet("font-weight: bold;");
-    layout->addWidget(m_consoleTitle);
-    layout->addStretch();
-
-    const QString buttonStyle =
-        "QToolButton { border: none; border-radius: 3px; padding: 1px; }"
-        "QToolButton:hover { background: #3a3d42; }"
-        "QToolButton:pressed { background: #2a2c30; }";
-
-    m_btnConsoleMinimize = new QToolButton(bar);
-    m_btnConsoleMinimize->setIcon(QIcon(":/icons/dock/minimize.svg"));
-    m_btnConsoleMinimize->setIconSize(QSize(14, 14));
-    m_btnConsoleMinimize->setAutoRaise(true);
-    m_btnConsoleMinimize->setStyleSheet(buttonStyle);
-    m_btnConsoleMinimize->setToolTip("Minimize the console");
-    connect(m_btnConsoleMinimize, &QToolButton::clicked, this, [this]() { setConsoleMinimized(!m_consoleMinimized); });
-    layout->addWidget(m_btnConsoleMinimize);
-
-    auto* closeButton = new QToolButton(bar);
-    closeButton->setIcon(QIcon(":/icons/dock/close.svg"));
-    closeButton->setIconSize(QSize(14, 14));
-    closeButton->setAutoRaise(true);
-    closeButton->setStyleSheet(buttonStyle);
-    closeButton->setToolTip("Close the console (it opens again with the next action, or via View > Console Output)");
-    connect(closeButton, &QToolButton::clicked, ui->dockConsoleOutput, &QWidget::hide);
-    layout->addWidget(closeButton);
-
-    ui->dockConsoleOutput->setTitleBarWidget(bar);
-
-    // Showing the console again (View menu, F12) always shows it expanded.
-    connect(ui->dockConsoleOutput, &QDockWidget::visibilityChanged, this, [this](bool visible) {
-        if (visible && m_consoleMinimized) setConsoleMinimized(false);
-    });
-}
-
-void MainWindow::setConsoleMinimized(bool minimized) {
-    if (minimized == m_consoleMinimized) return;
-    QDockWidget* dock = ui->dockConsoleOutput;
-
-    if (minimized) {
-        m_consoleRestoreHeight = qMax(80, dock->height());
-        dock->widget()->setMaximumHeight(0);  // keep it laid out so the bar keeps the full width
-        resizeDocks({dock}, {dock->titleBarWidget()->sizeHint().height()}, Qt::Vertical);
-    } else {
-        dock->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        resizeDocks({dock}, {m_consoleRestoreHeight}, Qt::Vertical);
-        m_consoleTitle->setText("Console Output");
-        m_consoleTitle->setStyleSheet("font-weight: bold;");
-    }
-    m_consoleMinimized = minimized;
-    m_btnConsoleMinimize->setIcon(QIcon(minimized ? ":/icons/dock/restore.svg" : ":/icons/dock/minimize.svg"));
-    m_btnConsoleMinimize->setToolTip(minimized ? "Restore the console" : "Minimize the console");
-}
-
 // A closed console opens again when the user starts something. A minimized one stays small.
-void MainWindow::ensureConsoleVisible() {
-    if (!ui->dockConsoleOutput->isVisible()) ui->dockConsoleOutput->show();
+void MainWindow::onAboutTriggered() {
+    HelpDialogs::showAbout(this);
+}
+
+void MainWindow::onWiringGuideTriggered() {
+    HelpDialogs::showWiringGuide(this);
+}
+
+// Dropped firmware files go to the slots (see FirmwareFiles::assignDroppedFiles).
+void MainWindow::dropEvent(QDropEvent* event) {
+    QStringList files;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile()) files << url.toLocalFile();
+    }
+
+    bool ignoredExtra = false;
+    const auto assignments = FirmwareFiles::assignDroppedFiles(files, &ignoredExtra);
+    if (assignments.isEmpty()) return;
+
+    for (const auto& a : assignments) {
+        const bool toSlot1 = (a.slot == 1);
+        (toSlot1 ? ui->editSlot1Path : ui->editSlot2Path)->setText(a.file);
+        (toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled)->setChecked(true);
+        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(a.file).fileName(),
+                                                   toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
+    }
+    if (ignoredExtra) appendLog("WARNING", "Only the first two dropped files were used.");
+    event->acceptProposedAction();
 }
