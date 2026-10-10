@@ -42,6 +42,7 @@ private slots:
     void onChipListReady(bool success, const QList<ChipEntry>& chips, const QString& error);
     void onAddChipFileTriggered();
     void onClearChipFilesTriggered();
+    void onSystemCheckTriggered();
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
     void onSlot1PathChanged(const QString& path);
@@ -76,6 +77,7 @@ private:
     bool prepareEngine();
     bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
     void rebuildChipCatalog();
+    QString currentProbeRsPath() const;
 
     Ui::MainWindow *ui;
     ProbeRsEngine *m_engine;

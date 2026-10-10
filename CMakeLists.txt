@@ -33,6 +33,14 @@ set(SOURCES
     src/engine/ChipDescription.cpp
     src/engine/BundledChips.h
     src/engine/BundledChips.cpp
+    src/engine/ProbeRsLocator.h
+    src/engine/ProbeRsLocator.cpp
+    src/engine/UsbScanner.h
+    src/engine/UsbScanner.cpp
+    src/engine/SystemCheck.h
+    src/engine/SystemCheck.cpp
+    src/ui/SystemCheckDialog.h
+    src/ui/SystemCheckDialog.cpp
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
@@ -120,6 +128,7 @@ if(PROBEDESK_BUILD_TESTS)
     add_executable(tst_probelist
         tests/tst_proberslist.cpp
         src/engine/ProbeRsEngine.cpp
+        src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
     )
@@ -132,6 +141,7 @@ if(PROBEDESK_BUILD_TESTS)
         src/core/ChipCatalog.cpp
         src/core/ChipCatalog.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
     )
@@ -156,4 +166,30 @@ if(PROBEDESK_BUILD_TESTS)
     target_include_directories(tst_bundledchips PRIVATE src)
     target_link_libraries(tst_bundledchips PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_bundledchips COMMAND tst_bundledchips)
+
+    add_executable(tst_systemcheck
+        tests/tst_systemcheck.cpp
+        src/engine/SystemCheck.cpp
+        src/engine/SystemCheck.h
+        src/engine/UsbScanner.cpp
+        src/engine/UsbScanner.h
+        src/engine/ProbeRsEngine.cpp
+        src/engine/ProbeRsEngine.h
+        src/engine/ProbeRsLocator.cpp
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_systemcheck PRIVATE src)
+    target_link_libraries(tst_systemcheck PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_systemcheck COMMAND tst_systemcheck)
+
+    add_executable(tst_usbscanner
+        tests/tst_usbscanner.cpp
+        src/engine/UsbScanner.cpp
+        src/engine/UsbScanner.h
+        src/engine/ProbeRsLocator.cpp
+        src/engine/ProbeRsLocator.h
+    )
+    target_include_directories(tst_usbscanner PRIVATE src)
+    target_link_libraries(tst_usbscanner PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_usbscanner COMMAND tst_usbscanner)
 endif()

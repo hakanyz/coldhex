@@ -222,6 +222,7 @@
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="actionSystemCheck"/>
     <addaction name="actionAbout"/>
    </widget>
    <addaction name="menuFile"/>
@@ -605,6 +606,14 @@
   <action name="actionRefreshProbes">
    <property name="text">
     <string>Refresh Probes</string>
+   </property>
+  </action>
+  <action name="actionSystemCheck">
+   <property name="text">
+    <string>System Check...</string>
+   </property>
+   <property name="toolTip">
+    <string>Check probe-rs, connected probes and drivers</string>
    </property>
   </action>
   <action name="actionAbout">

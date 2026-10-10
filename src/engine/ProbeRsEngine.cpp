@@ -1,4 +1,6 @@
 #include "ProbeRsEngine.h"
+#include "ProbeRsLocator.h"
+#include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
@@ -20,11 +22,9 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
             this, &ProbeRsEngine::onChipListFinished);
     connect(m_chipListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onChipListErrorOccurred);
 
-    // The probe-rs installer puts the binary in ~/.cargo/bin, which is not always on PATH.
-    if (QStandardPaths::findExecutable("probe-rs").isEmpty()) {
-        const QString fallback = QStandardPaths::findExecutable("probe-rs", {QDir::homePath() + "/.cargo/bin"});
-        if (!fallback.isEmpty()) m_executablePath = fallback;
-    }
+    // Prefer a probe-rs shipped with ProbeDesk, then PATH, then the installer's default folder.
+    const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
+    if (!found.isEmpty()) m_executablePath = found;
 }
 
 ProbeRsEngine::~ProbeRsEngine() {

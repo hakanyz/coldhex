@@ -4,8 +4,13 @@
 #include "core/AppSettings.h"
 #include "engine/ChipDescription.h"
 #include "engine/BundledChips.h"
+#include "engine/ProbeRsLocator.h"
+#include "SystemCheckDialog.h"
+#include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QCoreApplication>
+#include <QDir>
 #include <QCompleter>
 #include <QSettings>
 #include <QFileDialog>
@@ -52,6 +57,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
+    connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
     connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
     // Settings Panel Controls
@@ -78,6 +84,17 @@ MainWindow::MainWindow(QWidget *parent)
     onRefreshProbesTriggered();
     restoreSettings();
     m_engine->requestChipList();
+
+    // After the window is up, check the setup and open the System Check only if something needs fixing.
+    QTimer::singleShot(0, this, [this]() {
+        auto* dialog = new SystemCheckDialog(currentProbeRsPath(), this);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        if (dialog->runCheck()) {
+            dialog->open();
+        } else {
+            dialog->deleteLater();
+        }
+    });
     appendLog("INFO", "ProbeDesk v0.1 started.");
     updateUiState();
 }
@@ -704,4 +721,15 @@ void MainWindow::onTotalProgressChanged(int overallPercentage) {
 void MainWindow::onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz) {
     appendLog("WARN", QString("Auto-Speed fallback triggered -> %1 kHz. Retrying...").arg(newSpeedKhz), "#e67e22");
     ui->spinSpeed->setValue(static_cast<int>(newSpeedKhz));
+}
+
+QString MainWindow::currentProbeRsPath() const {
+    return ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
+}
+
+void MainWindow::onSystemCheckTriggered() {
+    auto* dialog = new SystemCheckDialog(currentProbeRsPath(), this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->runCheck();
+    dialog->open();
 }
