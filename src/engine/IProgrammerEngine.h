@@ -68,6 +68,8 @@ public:
     virtual void eraseTarget(bool fullErase = true) = 0;
     virtual void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) = 0;
     virtual void verifyFile(const QString& filePath, uint32_t baseAddress) = 0;
+    // Saves `byteCount` bytes starting at `address` to `outputFile` as raw binary.
+    virtual void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) = 0;
     virtual void resetTarget(bool halt = false) = 0;
     virtual void cancelCurrentOperation() = 0;
 

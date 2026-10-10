@@ -196,6 +196,7 @@
     <property name="title">
      <string>Edit</string>
     </property>
+    <addaction name="actionSaveLog"/>
     <addaction name="actionClearLog"/>
    </widget>
    <widget class="QMenu" name="menuTarget">
@@ -637,6 +638,11 @@
    </property>
    <property name="toolTip">
     <string>Open HEX file into viewer</string>
+   </property>
+  </action>
+  <action name="actionSaveLog">
+   <property name="text">
+    <string>Save Log...</string>
    </property>
   </action>
   <action name="actionClearLog">

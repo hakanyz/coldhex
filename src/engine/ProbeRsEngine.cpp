@@ -402,3 +402,19 @@ ChipMemoryMap ProbeRsEngine::queryMemoryMap(const QString& chipName, const QStri
     if (proc.exitCode() != 0) return {};
     return parseChipInfo(QString::fromUtf8(proc.readAllStandardOutput()));
 }
+
+void ProbeRsEngine::readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) {
+    if (isBusy() || byteCount == 0) return;
+
+    // 32-bit words are much faster than bytes; fall back to bytes for odd sizes or addresses.
+    const bool wordAligned = (address % 4 == 0) && (byteCount % 4 == 0);
+    const QString width = wordAligned ? "b32" : "b8";
+    const uint64_t count = wordAligned ? byteCount / 4 : byteCount;
+
+    QStringList args = QStringList{"read"} + targetArgs();
+    args << "--output" << outputFile << "--format" << "binary"
+         << width << QString("0x%1").arg(address, 8, 16, QLatin1Char('0')) << QString::number(count);
+
+    runCommand(args, EngineState::Reading,
+               QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0')));
+}

@@ -11,6 +11,7 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QCompleter>
 #include <QLineEdit>
 #include <QStringListModel>
@@ -51,6 +52,8 @@ MainWindow::MainWindow(QWidget *parent)
     // Toolbar Actions
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::onConnectTriggered);
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
+    connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
+    connect(ui->actionSaveLog, &QAction::triggered, this, &MainWindow::onSaveLogTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
@@ -190,10 +193,8 @@ void MainWindow::setupUiCustomizations() {
     ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-    // Not implemented yet: keep it disabled instead of faking a result.
-    ui->actionRead->setEnabled(false);
-    ui->actionRead->setToolTip("Read target memory - not implemented yet");
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
+    ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
 
     ui->statusBar->showMessage("Ready");
 }
@@ -406,6 +407,7 @@ void MainWindow::updateUiState() {
     bool busy = m_isOperationRunning || m_engine->isBusy();
     ui->actionConnect->setEnabled(!busy && !m_engine->isConnected());
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
+    ui->actionRead->setEnabled(!busy);
     ui->actionErase->setEnabled(!busy);
     ui->actionProgram->setEnabled(!busy);
     ui->actionVerify->setEnabled(!busy);
@@ -827,9 +829,73 @@ void MainWindow::onCancelTriggered() {
 // Single commands (Erase, Reset, ...) end here; during a sequence the coordinator decides
 // what happens next and the window is updated from its own signals.
 void MainWindow::onEngineOperationFinished(bool success, const QString& message) {
-    Q_UNUSED(success);
     Q_UNUSED(message);
+
+    // A memory read just ended: show what was read.
+    if (!m_pendingReadFile.isEmpty()) {
+        const QString file = m_pendingReadFile;
+        m_pendingReadFile.clear();
+        m_isOperationRunning = false;
+        updateUiState();
+
+        QFile in(file);
+        if (success && in.open(QIODevice::ReadOnly)) {
+            m_targetReadData = in.readAll();
+            m_targetReadBaseAddress = m_pendingReadBase;
+            ui->radioSourceTarget->setChecked(true);
+            updateMemoryViewer();
+            appendLog("SUCCESS", QString("Read %1 bytes into %2").arg(m_targetReadData.size()).arg(file), "#2ecc71");
+        } else if (success) {
+            appendLog("ERROR", "The read finished, but the output file could not be opened: " + file, "#e74c3c");
+        }
+        return;
+    }
+
     if (m_sequenceRunning) return;
     m_isOperationRunning = false;
     updateUiState();
+}
+
+void MainWindow::onReadTargetTriggered() {
+    if (!prepareEngine()) return;
+
+    const QString chip = ui->comboModel->currentText().trimmed();
+    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(chip, entry ? entry->descriptionFile : QString());
+    const MemoryRegion* flash = memory.mainFlash();
+    if (!flash) {
+        const QString msg = "The flash size of this chip is unknown, so the whole flash cannot be read.";
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Read Flash", msg);
+        return;
+    }
+
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                  .filePath(chip + "_flash.bin");
+    const QString file = QFileDialog::getSaveFileName(this, "Save Flash Contents As", suggested,
+                                                      "Binary (*.bin);;All Files (*.*)");
+    if (file.isEmpty()) return;
+
+    m_pendingReadFile = file;
+    m_pendingReadBase = static_cast<uint32_t>(flash->start);
+    m_isOperationRunning = true;
+    updateUiState();
+    appendLog("INFO", QString("Reading %1 KiB of flash from 0x%2...")
+                          .arg(flash->size / 1024).arg(flash->start, 8, 16, QLatin1Char('0')));
+    m_engine->readMemory(flash->start, flash->size, file);
+}
+
+void MainWindow::onSaveLogTriggered() {
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                  .filePath("probedesk-log.txt");
+    const QString file = QFileDialog::getSaveFileName(this, "Save Log", suggested, "Text (*.txt);;All Files (*.*)");
+    if (file.isEmpty()) return;
+
+    QFile out(file);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Save Log", "Cannot write to " + file);
+        return;
+    }
+    out.write(ui->textLog->toPlainText().toUtf8());
+    appendLog("INFO", "Log saved to " + file);
 }

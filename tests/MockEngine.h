@@ -35,6 +35,10 @@ public:
         commands << QString("program:%1@0x%2%3").arg(filePath).arg(baseAddress, 0, 16).arg(verify ? ":verify" : "");
         m_busy = true;
     }
+    void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) override {
+        commands << QString("read:0x%1+%2:%3").arg(address, 0, 16).arg(byteCount).arg(outputFile);
+        m_busy = true;
+    }
     void resetTarget(bool) override { commands << "reset"; m_busy = true; }
     void cancelCurrentOperation() override { commands << "cancel"; m_busy = false; }
 

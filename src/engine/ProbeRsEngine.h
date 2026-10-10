@@ -10,6 +10,7 @@ enum class EngineState {
     Erasing,
     Programming,
     Verifying,
+    Reading,
     Resetting
 };
 
@@ -30,6 +31,7 @@ public:
     void eraseTarget(bool fullErase = true) override;
     void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) override;
     void verifyFile(const QString& filePath, uint32_t baseAddress) override;
+    void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) override;
     void resetTarget(bool halt = false) override;
     void cancelCurrentOperation() override;
 

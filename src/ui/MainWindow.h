@@ -44,6 +44,8 @@ private slots:
     void onAddChipFileTriggered();
     void onClearChipFilesTriggered();
     void onSystemCheckTriggered();
+    void onReadTargetTriggered();
+    void onSaveLogTriggered();
     void onCancelTriggered();
     void onEngineOperationFinished(bool success, const QString& message);
     void onChipTextCommitted();
@@ -107,4 +109,6 @@ private:
 
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
+    QString m_pendingReadFile;       // set while a memory read is running
+    uint32_t m_pendingReadBase = 0;
 };
