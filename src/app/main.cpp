@@ -1,0 +1,146 @@
+#include <QApplication>
+#include <QIcon>
+#include <QStyleFactory>
+#include <QPalette>
+#include "ui/MainWindow.h"
+
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+
+    app.setApplicationName("ProbeDesk");
+    app.setApplicationVersion(PROBEDESK_VERSION);
+    app.setWindowIcon(QIcon(":/icons/probedesk.png"));
+    app.setOrganizationName("ProbeDesk Project");
+
+    // Fusion style base
+    app.setStyle(QStyleFactory::create("Fusion"));
+
+    // Modern Dark Palette matching image_1.jpg
+    QPalette darkPalette;
+    darkPalette.setColor(QPalette::Window, QColor(32, 33, 36));
+    darkPalette.setColor(QPalette::WindowText, QColor(220, 220, 220));
+    darkPalette.setColor(QPalette::Base, QColor(24, 25, 27));
+    darkPalette.setColor(QPalette::AlternateBase, QColor(32, 33, 36));
+    darkPalette.setColor(QPalette::ToolTipBase, Qt::white);
+    darkPalette.setColor(QPalette::ToolTipText, Qt::white);
+    darkPalette.setColor(QPalette::Text, QColor(225, 225, 225));
+    darkPalette.setColor(QPalette::Button, QColor(45, 47, 51));
+    darkPalette.setColor(QPalette::ButtonText, QColor(225, 225, 225));
+    darkPalette.setColor(QPalette::BrightText, Qt::red);
+    darkPalette.setColor(QPalette::Link, QColor(41, 128, 185));
+    darkPalette.setColor(QPalette::Highlight, QColor(0, 122, 204));
+    darkPalette.setColor(QPalette::HighlightedText, Qt::white);
+
+    darkPalette.setColor(QPalette::Disabled, QPalette::Text, QColor(110, 110, 110));
+    darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(110, 110, 110));
+
+    app.setPalette(darkPalette);
+
+    // Modern dark styling matching image_1.jpg
+    app.setStyleSheet(R"(
+        QMainWindow {
+            background-color: #202124;
+        }
+        QToolBar {
+            background-color: #27282c;
+            border-bottom: 1px solid #3c3f41;
+            padding: 4px;
+            spacing: 6px;
+        }
+        QToolButton {
+            color: #e0e0e0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        QToolButton:hover {
+            background-color: #383a40;
+        }
+        QToolButton:pressed {
+            background-color: #007acc;
+        }
+        QDockWidget {
+            color: #ffffff;
+            font-weight: bold;
+            titlebar-close-icon: url();
+            titlebar-normal-icon: url();
+        }
+        QDockWidget::title {
+            background: #2b2d30;
+            padding: 5px;
+            border: 1px solid #3c3f41;
+        }
+        QGroupBox {
+            font-weight: bold;
+            border: 1px solid #3c3f41;
+            border-radius: 4px;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px;
+            padding: 0 4px;
+            color: #dcdcdc;
+        }
+        QTableView {
+            background-color: #1a1a1c;
+            alternate-background-color: #222326;
+            color: #dcdcdc;
+            gridline-color: #2d2f33;
+            border: 1px solid #3c3f41;
+            selection-background-color: #007acc;
+            selection-color: #ffffff;
+        }
+        QHeaderView::section {
+            background-color: #2b2d30;
+            color: #bbbbbb;
+            padding: 3px;
+            border: 1px solid #3c3f41;
+            font-weight: bold;
+        }
+        QPlainTextEdit {
+            background-color: #18191b;
+            color: #dcdcdc;
+            border: 1px solid #3c3f41;
+            border-radius: 3px;
+        }
+        QLineEdit, QComboBox, QSpinBox {
+            background-color: #2b2d30;
+            color: #ffffff;
+            border: 1px solid #45494a;
+            border-radius: 3px;
+            padding: 2px 4px;
+        }
+        QPushButton {
+            background-color: #3b3e43;
+            color: #ffffff;
+            border: 1px solid #4f5358;
+            border-radius: 3px;
+            padding: 4px 10px;
+        }
+        QPushButton:hover {
+            background-color: #484c52;
+        }
+        QPushButton:pressed {
+            background-color: #007acc;
+        }
+        QProgressBar {
+            background-color: #2b2d30;
+            border: 1px solid #3c3f41;
+            border-radius: 3px;
+            text-align: center;
+        }
+        QProgressBar::chunk {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1976d2, stop:1 #42a5f5);
+            border-radius: 2px;
+        }
+    )");
+
+    MainWindow window;
+    window.resize(1180, 760);
+    window.show();
+
+    return app.exec();
+}

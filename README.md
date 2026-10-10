@@ -1,15 +1,140 @@
 # ProbeDesk
 
-ProbeDesk, ARM Cortex-M tabanlı mikrodenetleyiciler (STM32, GD32, Geehy/APM32, TI, Nuvoton vb.) için geliştirilmiş, donanım ve üretici bağımsız modern masaüstü flaşlama ve yönetim aracıdır.
+[![Build and package](https://github.com/hakanyz/probedesk/actions/workflows/build.yml/badge.svg)](https://github.com/hakanyz/probedesk/actions/workflows/build.yml)
+[![License: LGPL v3](https://img.shields.io/badge/license-LGPL--3.0-blue.svg)](LICENSE)
 
-## Özellikler
+A desktop tool to flash and manage ARM Cortex-M microcontrollers over **ST-Link**, **J-Link** and
+**CMSIS-DAP** probes. It is vendor independent: STM32, GD32, Geehy APM32, TI, NXP, Nordic and
+every other chip supported by [probe-rs](https://probe.rs), in one window.
 
-- **Geniş Çip Ekosistemi:** CMSIS-Pack destekli Cortex-M aileleri (STM32, GD32, Geehy, TI, Nuvoton vb.)
-- **Donanım Köprüsü Desteği:** J-Link, RailLink ve CMSIS-DAP
-- **probe-rs Motoru:** Güçlü, bağımsız ve açık kaynaklı Rust tabanlı flaşlama altyapısı
-- **Çift Slot Flaşlama:** Bootloader ve Uygulama ikililerini tek seferde sıralı yazma ve doğrulama
-- **Otomatik Hız Yönetimi:** Kararsız bağlantılarda dinamik frekans düşürme (Auto-Speed)
-- **Modern ve Modüler Mimari:** Presentation (Qt Widgets), Core ve Engine katmanlı yapı
+![ProbeDesk main window](docs/screenshot.png)
 
-## Lisans
-MIT
+> **Status: beta.** The logic is covered by automated tests, but programming has so far seen only
+> limited testing on real hardware. Please report problems through the issue tracker.
+
+## Features
+
+- **Wide chip support** – search more than 4,000 chips while you type; the manufacturer box follows
+  your selection. Geehy APM32 (F0, F1, F4) is bundled; other CMSIS-Pack chips can be added.
+- **Two firmware slots** – flash a bootloader and an application in one run, each with its own start
+  address. Overlaps between the slots and writes outside the chip's flash are refused.
+- **Firmware formats** – Intel HEX (checksums are validated), raw binary with a start address, and ELF.
+  Drag and drop files onto the window.
+- **Full workflow** – Connect, Erase, Program, Verify, Read the flash into a file, Reset, and Stop a
+  running operation. Erase / verify / reset after programming are optional.
+- **Reliable connections** – SWD or JTAG, adjustable speed, *connect under reset*, and an automatic
+  speed reduction that resumes the sequence at the step that failed.
+- **System Check** – on start-up ProbeDesk looks for probe-rs, connected probes and their drivers and
+  tells you what is missing and how to fix it (Help > System Check).
+- **Memory viewer** – inspect a HEX/BIN/ELF file or the data read back from the chip.
+- **Self-contained packages** – probe-rs is included, and so are the Qt libraries on Windows (on Ubuntu apt installs them); nothing else to install
+  apart from the probe driver on Windows.
+
+## Install
+
+Download the package for your system from the
+[Releases](https://github.com/hakanyz/probedesk/releases) page.
+
+| System | File | How |
+|---|---|---|
+| Windows 10/11 (64-bit) | `probedesk-<version>-win64.exe` | Run the installer |
+| Windows 10/11 (64-bit) | `probedesk-<version>-win64.zip` | Unpack anywhere, start `bin\probedesk.exe` |
+| Ubuntu 22.04 (64-bit) | `probedesk_<version>_amd64.deb` | `sudo apt install ./probedesk_<version>_amd64.deb` |
+| Linux (64-bit) | `probedesk-<version>-Linux.tar.gz` | Unpack, start `usr/bin/probedesk` (needs the Qt 6 libraries) |
+
+### Probe drivers
+
+| Probe | Windows | Linux |
+|---|---|---|
+| ST-Link | Install the official ST-LINK USB driver from st.com | Nothing to do – the `.deb` installs the USB rules |
+| J-Link | probe-rs needs the WinUSB driver (for example installed with [Zadig](https://zadig.akeo.ie)). SEGGER's own tools no longer find the probe afterwards. | Nothing to do – the `.deb` installs the USB rules |
+| CMSIS-DAP | No driver needed | Nothing to do – the `.deb` installs the USB rules |
+
+If a driver is missing, **Help > System Check** says so.
+
+## Quick start
+
+1. Connect the probe and the target board.
+2. Pick the **Manufacturer** and **Model** (or type part of the chip name).
+3. Choose **Interface** and **Speed**, then press **Connect**.
+4. Select your firmware for **Slot 1** (bootloader, optional) and/or **Slot 2** (application). For
+   `.bin` files enter the start address; HEX and ELF files carry their own addresses.
+5. Press **Program**.
+
+## Chips that probe-rs does not know
+
+Generate a chip description from the vendor's CMSIS-Pack with probe-rs'
+[`target-gen`](https://github.com/probe-rs/probe-rs/releases) and add it in ProbeDesk:
+
+```
+target-gen pack <vendor>.pack <output-folder>
+```
+
+Then use **Tools > Add Chip Description File...**. To ship chips inside your own build, put the
+generated `.yaml` files into `resources/chips/` and re-run CMake; they are loaded on every start.
+
+## Building from source
+
+Requirements: a C++17 compiler, CMake 3.16 or newer and Qt 6 (Widgets). The continuous integration
+builds with Qt 6.8 on Windows (MinGW) and Qt 6.2 on Ubuntu 22.04.
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+The program looks for `probe-rs` next to itself, then on `PATH`. Install it from
+[probe.rs](https://probe.rs/docs/getting-started/installation/) when running a local build.
+
+### Packages
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPROBEDESK_PROBE_RS_DIR=<folder with probe-rs>
+cmake --build build
+cd build && cpack
+```
+
+CPack creates `.zip` and `.exe` on Windows and `.deb` and `.tar.gz` on Linux. The workflow in
+`.github/workflows/build.yml` does this for every push; tags that start with `v` are published as
+GitHub releases (a tag with a dash, such as `v0.1.0-beta1`, as a pre-release).
+
+## Project layout
+
+```
+src/
+├── app/        Application entry point and theme
+├── ui/         Qt Widgets interface: main window, memory viewer, System Check
+├── core/       Flash coordinator, firmware parsers, settings, chip catalogue
+└── engine/     Engine interface and the probe-rs driver
+tests/          Unit tests (Qt Test) with a mock engine
+resources/      Icons and bundled chip descriptions
+packaging/      Linux package files, third-party notices
+docs/           Screenshot and the manual test checklist
+```
+
+The interface never talks to probe-rs directly: it uses the `IProgrammerEngine` interface, so the
+flashing back-end can be exchanged or mocked in tests.
+
+## Testing
+
+`ctest` runs the automated tests. Before a release, also work through the
+[manual test checklist](docs/TESTING.md) on real hardware.
+
+## Contributing
+
+Development follows a simple branch model:
+
+- `main` holds released versions only.
+- `develop` is the integration branch.
+- Work happens in `feature/<name>` branches that start from `develop` and are merged back through a
+  pull request.
+
+Please make sure `ctest` passes and describe what you changed and how you tested it.
+
+## License
+
+ProbeDesk is licensed under the [GNU Lesser General Public License v3.0](LICENSE) (the GPL text it
+refers to is in [COPYING](COPYING)). Third-party components – Qt (LGPL v3), probe-rs (MIT or
+Apache-2.0) and the generated chip descriptions – are listed in
+[packaging/THIRD_PARTY_NOTICES.md](packaging/THIRD_PARTY_NOTICES.md).

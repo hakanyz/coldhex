@@ -1,0 +1,100 @@
+name: APM32F0 Series
+generated_from_pack: true
+pack_file_release: 1.0.7
+variants:
+- name: APM32F003F4
+  cores:
+  - name: main
+    type: armv6m
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x0
+      end: 0x4000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20000800
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f00x_32
+  - apm32f00x_opt
+- name: APM32F003F6
+  cores:
+  - name: main
+    type: armv6m
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x0
+      end: 0x8000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20001000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f00x_32
+  - apm32f00x_opt
+flash_algorithms:
+- name: apm32f00x_32
+  description: APM32F00x Low-density Flash
+  default: true
+  instructions: ELUDRgAgR0wgYEdIYGBHSGBgIEbAaQQkIEAAKAbRVSBDTCBgBiBgYP8goGAAIBC9AUY8SABpgCIQQzpKEGEAIHBHOEgAaQQhCEM2SQhhCEYAaUAhCEMzSQhhAuCqIDRJCGAwSMBowAfADwAo9tEtSABpBCGIQytJCGEAIHBHAUYoSABpAiIQQyZKEGEQRkFhAGlAIhBDI0oQYQLgqiAkShBgIEjAaMAHwA8AKPbRHUgAaQIikEMbShBhACBwRxC1A0ZIHEEISQAn4BZIAGkBJCBDFEwgYRCIGIAC4KogFEwgYBBIwGjAB8APACj20Q1IAGlACEAAC0wgYSBGwGgUJCBAACgG0AdIwGggQwVM4GABIBC9mxySHIkeACnV0QAg9+cAAAAQAUAjAWdFq4nvzQAgAEAAAAAA
+  pc_init: 0x1
+  pc_uninit: 0x31
+  pc_program_page: 0xbf
+  pc_erase_sector: 0x7f
+  pc_erase_all: 0x43
+  data_section_offset: 0x134
+  flash_properties:
+    address_range:
+      start: 0x0
+      end: 0x8000
+    page_size: 0x400
+    erased_byte_value: 0xff
+    program_page_timeout: 100
+    erase_sector_timeout: 500
+    sectors:
+    - size: 0x400
+      address: 0x0
+- name: apm32f00x_opt
+  description: APM32F00x Flash Options
+  instructions: ELUDRnpIe0xgYHtIYGB4SKBgeUigYAAgIGAgRsBoFCQgQ3RM4GAgRsBpECQgQAAoBtFySHJMIGAGIGBgcUigYAAgEL0BRmtIAGkBIlICkENoShBhEEYAaYAiEENlShBhACBwR2NIwGkCIhBAACgB0AAgAOClIAFGXkjAaBQiEENcStBgEEYAaVIVEENZShBhEEYAaSAiEENWShBhEEYAaUAiEENTShBhAuBXSFRKEGBQSMBowAfADwAo9tFNSABpICKQQ0tKEGEH4EpIwGgUIhBDSErQYAEgcEdGSMBoFCIQQAAo8dEAv/bnAkZBSMBpAiMYQAAoAdAAIADgpSABRjxIwGgUIxhDOkvYYBhGAGlbFRhDN0sYYRhGAGkgIxhDNEsYYRhGAGlAIxhDMUsYYQLgNUgySxhgLkjAaMAHwA8AKPbRK0gAaSAjmEMpSxhhB+AoSMBoFCMYQyZL2GABIHBHJEjAaBQjGEAAKPHRAL/25xC1A0ZIHEEISQAdSMBoFCQgQxtM4GAgRgBpZBUgQxhMIGEn4BdIAGkQJCBDFUwgYRCIGIAC4BdIFUwgYBFIwGjAB8APACj20Q5IAGkQJKBDDEwgYSBGwGgUJCBAACgG0AhIwGggQwZM4GABIBC9mxySHIkeACnV0QAg9+cAACMBZ0UAEAFAq4nvzVVVAAAAIABA/w8AAKqqAAAAAAAA
+  pc_init: 0x1
+  pc_uninit: 0x45
+  pc_program_page: 0x173
+  pc_erase_sector: 0xeb
+  pc_erase_all: 0x65
+  data_section_offset: 0x20c
+  flash_properties:
+    address_range:
+      start: 0x20400
+      end: 0x20418
+    page_size: 0x18
+    erased_byte_value: 0xff
+    program_page_timeout: 3000
+    erase_sector_timeout: 3000
+    sectors:
+    - size: 0x18
+      address: 0x0

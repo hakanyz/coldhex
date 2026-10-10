@@ -1,0 +1,1721 @@
+name: APM32F4 Series
+generated_from_pack: true
+pack_file_release: 1.0.12
+variants:
+- name: APM32F402CB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F402RB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F402TB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F403CB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F403RB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F403TB
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8020000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20008000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f402_128
+  - apm32f402_opt
+- name: APM32F405RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F405VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F405ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407IE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407IG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407RE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407VE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407ZE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F407ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411CC
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8040000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411CE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411RC
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8040000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411RE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411VC
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8040000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F411VE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F415RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F415VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F415ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417IE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417IG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417VE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417ZE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F417ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F423CG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20050000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F423RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20050000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F423VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20050000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F423ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20050000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F425CG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F425RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F425VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F425ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F427CG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20060000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F427RG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20060000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F427VG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20060000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F427ZG
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8100000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20060000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f40xxx_41xxx_opt
+  - apm32f4xx_otp
+- name: APM32F465RE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f465xx_opt
+  - apm32f4xx_otp
+- name: APM32F465VE
+  cores:
+  - name: main
+    type: armv7em
+    core_access_options: !Arm
+      ap: !v1 0
+  memory_map:
+  - !Nvm
+    name: IROM1
+    range:
+      start: 0x8000000
+      end: 0x8080000
+    cores:
+    - main
+    access:
+      write: false
+      boot: true
+  - !Generic
+    name: IRAM2
+    range:
+      start: 0x10000000
+      end: 0x10010000
+    cores:
+    - main
+    access:
+      execute: false
+  - !Ram
+    name: IRAM1
+    range:
+      start: 0x20000000
+      end: 0x20020000
+    cores:
+    - main
+  flash_algorithms:
+  - apm32f4xx_1024
+  - apm32f465xx_opt
+  - apm32f4xx_otp
+flash_algorithms:
+- name: apm32f402_128
+  description: APM32F402 Flash
+  default: true
+  instructions: ELUDRgAgRUwgYEVIYGBFSGBgIEbAaQQkIEAAKAbRQkhCTCBgBiBgYEFIoGAAIBC9AUY6SABpgCIQQzhKEGEAIHBHNkgAaQQhCEM0SQhhCEYAaUAhCEMxSQhhAuA1SDNJCGAuSMBowAfADwAo9tErSABpBCGIQylJCGEAIHBHAUYmSABpAiIQQyRKEGEQRkFhAGlAIhBDIUoQYQLgJUgjShBgHkjAaMAHwA8AKPbRG0gAaQIikEMZShBhACBwRxC1A0ZIHEEISQAk4BRIAGkBJCBDEkwgYRCIGIAAvw9IwGjAB8APACj50QxIAGlACEAACkwgYSBGwGgUJCBAACgG0AZIwGggQwVM4GABIBC9mxySHIkeACnY0QAg9+cAIAJAIwFnRauJ781VVQAAADAAQP8PAACqqgAAAAAAAA==
+  pc_init: 0x1
+  pc_uninit: 0x31
+  pc_program_page: 0xbf
+  pc_erase_sector: 0x7f
+  pc_erase_all: 0x43
+  data_section_offset: 0x138
+  flash_properties:
+    address_range:
+      start: 0x8000000
+      end: 0x8020000
+    page_size: 0x400
+    erased_byte_value: 0xff
+    program_page_timeout: 100
+    erase_sector_timeout: 500
+    sectors:
+    - size: 0x400
+      address: 0x0
+- name: apm32f402_opt
+  description: APM32F402 Flash Options
+  instructions: ELUDRgAgYEwgYGBIYGBgSGBgXkigYF5IoGAgRsBpBCQgQAAoBtFbSFtMIGAGIGBgWkigYAAgEL0BRlNIAGn/IgEykENQShBhEEYAaYAiEENNShBhACBwR0tIAGkgIQhDSUkIYQhGAGlAIQhDRkkIYQLgS0hISQhgQ0jAaMAHwA8AKPbRQEgAaSAhiEM+SQhhCEYAaRAhCEM7SQhhQUhCSQiAAuA+SDxJCGA3SMBowAfADwAo9tE0SABpECGIQzJJCGEIRsBoFCEIQAAoBtAuSMBoCEMsSchgASBwRwAg/OcBRilIAGkgIhBDJ0oQYRBGAGlAIhBDJEoQYQLgKEgmShBgIUjAaMAHwA8AKPbRHkgAaSAikEMcShBhACBwRwNGASBwRxC1A0ZIHEEISQAn4BVIAGkQJCBDE0wgYRCIGIAC4BdIFEwgYA9IwGjAB8APACj20QxIAGkQJKBDCkwgYSBGwGgUJCBAACgG0AZIwGggQwVM4GABIBC9mxySHIkeACnV0QAg9+cAIAJAIwFnRauJ781VVQAAADAAQP8PAACqqgAApVoAAAD4/x8AAAAA
+  pc_init: 0x1
+  pc_uninit: 0x39
+  pc_program_page: 0x125
+  pc_erase_sector: 0xe1
+  pc_erase_all: 0x59
+  pc_blank_check: 0x11f
+  data_section_offset: 0x1ac
+  flash_properties:
+    address_range:
+      start: 0x1ffff800
+      end: 0x1ffff810
+    page_size: 0x10
+    erased_byte_value: 0xff
+    program_page_timeout: 3000
+    erase_sector_timeout: 3000
+    sectors:
+    - size: 0x10
+      address: 0x0
+- name: apm32f4xx_1024
+  description: APM32F4xx 1MB Flash
+  default: true
+  instructions: AAMADiAoAtNACQAdcEcQKALTAAnAHHBHgAhwR0JIQUlBYEJJQWAAIQFgwWjwIhFDwWBAaYAGBtQ+SD1JAWAGIUFgPUmBYAAgcEc3SAFpQgURQwFhACBwRxC1M0gBaQQkIUMBYQFpogMRQwFhM0kxSgDgEWDDaNsD+9QBaaFDAWEAIBC9MLX/97v/J0nKaPAjGkPKYAIkDGEKacAGAA4CQwphCGniAxBDCGEkSCFKAOAQYM1o7QP71AhpoEMIYchoAAYADwPQyGgYQ8hgASAwvXC1FU3JHIkI62iJAPAmM0PrYAAjK2EWSxfgLGkcQyxhFGgEYOxo5AP81CxpZAhkACxh7GgkBiQPBNDoaDBD6GABIHC9AB0JHxIdACnl0QAgcL0AACMBZ0UAPAJAq4nvzVVVAAAAMABA/w8AAKqqAAABAgAAAAAAAA==
+  pc_init: 0x1d
+  pc_uninit: 0x4b
+  pc_program_page: 0xd1
+  pc_erase_sector: 0x85
+  pc_erase_all: 0x59
+  data_section_offset: 0x144
+  flash_properties:
+    address_range:
+      start: 0x8000000
+      end: 0x8100000
+    page_size: 0x400
+    erased_byte_value: 0xff
+    program_page_timeout: 100
+    erase_sector_timeout: 6000
+    sectors:
+    - size: 0x4000
+      address: 0x0
+    - size: 0x10000
+      address: 0x10000
+    - size: 0x20000
+      address: 0x20000
+- name: apm32f40xxx_41xxx_opt
+  description: APM32F40xxx/41xxx Flash Options
+  instructions: LEgrSYFgLEmBYMFo8CIRQ8FgQGmABgbUKUgoSQFgBiFBYChJgWAAIHBHIkhBaQEiEUNBYQAgcEceSMJo8CEKQ8JgIUpCYUJpAiMaQ0JhwmgSBhIPBNDCaApDwmABIHBHACBwRwAgcEcSSBFow2jwIhNDw2AVSxlAiRxBYcFoyQP81MFoCQYJDwTQwWgRQ8FgASBwRwAgcEcQtQZMEmgLS2RpGkAcQKJCANFAGBC9AAA7KhkIADwCQH9uXUxVVQAAADAAQP8PAADsqv8P/P//DwAAAAA=
+  pc_init: 0x1
+  pc_uninit: 0x2b
+  pc_program_page: 0x69
+  pc_erase_sector: 0x65
+  pc_erase_all: 0x39
+  pc_verify: 0x99
+  data_section_offset: 0xd0
+  flash_properties:
+    address_range:
+      start: 0x1fffc000
+      end: 0x1fffc004
+    page_size: 0x4
+    erased_byte_value: 0xff
+    program_page_timeout: 3000
+    erase_sector_timeout: 3000
+    sectors:
+    - size: 0x4
+      address: 0x0
+- name: apm32f4xx_otp
+  description: APM32F4xx Flash OTP
+  instructions: JUgkSUFgJUlBYAAhAWDBaPAiEUPBYEBpgAYG1CFIIEkBYAYhQWAgSYFgACBwRxpIAWlCBRFDAWEAIHBHACBwR3C1FU3JHIkI62iJAPAmM0PrYAAjK2EVSxfgLGkcQyxhFGgEYOxo5AP81CxpZAhkACxh7GgkBiQPBNDoaDBD6GABIHC9AB0JHxIdACnl0QAgcL0AACMBZ0UAPAJAq4nvzVVVAAAAMABA/w8AAAECAAAAAAAA
+  pc_init: 0x1
+  pc_uninit: 0x2f
+  pc_program_page: 0x41
+  pc_erase_sector: 0x3d
+  data_section_offset: 0xb0
+  flash_properties:
+    address_range:
+      start: 0x1fff7800
+      end: 0x1fff7a10
+    page_size: 0x210
+    erased_byte_value: 0xff
+    program_page_timeout: 3000
+    erase_sector_timeout: 3000
+    sectors:
+    - size: 0x210
+      address: 0x0
+- name: apm32f465xx_opt
+  description: APM32F465 Flash Options
+  instructions: LEgrSYFgLEmBYMFo8CIRQ8FgQGmABgbUKUgoSQFgBiFBYChJgWAAIHBHIkhBaQEiEUNBYQAgcEceSMJo8CEKQ8JgIUpCYUJpAiMaQ0JhwmgSBhIPBNDCaApDwmABIHBHACBwRwAgcEcSSBFow2jwIhNDw2AVSxlAiRxBYcFoyQP81MFoCQYJDwTQwWgRQ8FgASBwRwAgcEcQtQZMEmgLS2RpGkAcQKJCANFAGBC9AAA7KhkIADwCQH9uXUxVVQAAADAAQP8PAADsqv8P/P//zwAAAAA=
+  pc_init: 0x1
+  pc_uninit: 0x2b
+  pc_program_page: 0x69
+  pc_erase_sector: 0x65
+  pc_erase_all: 0x39
+  pc_verify: 0x99
+  data_section_offset: 0xd0
+  flash_properties:
+    address_range:
+      start: 0x1fffc000
+      end: 0x1fffc004
+    page_size: 0x4
+    erased_byte_value: 0xff
+    program_page_timeout: 3000
+    erase_sector_timeout: 3000
+    sectors:
+    - size: 0x4
+      address: 0x0
