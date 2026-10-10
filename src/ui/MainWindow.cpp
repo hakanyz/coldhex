@@ -39,6 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
     connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
+    connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);
@@ -60,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
     connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
+    connect(ui->actionCancel, &QAction::triggered, this, &MainWindow::onCancelTriggered);
     connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
     // Settings Panel Controls
@@ -130,6 +132,10 @@ void MainWindow::restoreSettings() {
 
     ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
     ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
+    ui->checkEraseBeforeFlash->setChecked(s.eraseBeforeFlash);
+    ui->checkVerifyAfterFlash->setChecked(s.verifyAfterFlash);
+    ui->checkResetAfterFlash->setChecked(s.resetAfterFlash);
+    ui->checkConnectUnderReset->setChecked(s.connectUnderReset);
     ui->editSlot1Path->setText(s.slot1Path);
     if (!s.slot1Address.isEmpty()) ui->editSlot1Address->setText(s.slot1Address);
     if (!s.slot2Address.isEmpty()) ui->editSlot2Address->setText(s.slot2Address);
@@ -153,6 +159,10 @@ void MainWindow::saveSettings() {
     s.customChipFiles = m_customChipFiles;
     s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
     s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
+    s.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
+    s.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
+    s.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
+    s.connectUnderReset = ui->checkConnectUnderReset->isChecked();
     s.geometry = saveGeometry();
     s.windowState = saveState();
 
@@ -351,7 +361,14 @@ bool MainWindow::prepareEngine() {
 
     const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
     const QString descriptionFile = entry ? entry->descriptionFile : QString();
-    m_engine->configureTarget(chip, ui->spinSpeed->value(), ui->comboProbe->currentData().toString(), descriptionFile);
+    TargetSettings target;
+    target.chipName = chip;
+    target.speedKhz = ui->spinSpeed->value();
+    target.probeId = ui->comboProbe->currentData().toString();
+    target.chipDescriptionPath = descriptionFile;
+    target.protocol = (ui->comboInterface->currentText() == "JTAG") ? DebugProtocol::Jtag : DebugProtocol::Swd;
+    target.connectUnderReset = ui->checkConnectUnderReset->isChecked();
+    m_engine->configureTarget(target);
     return true;
 }
 
@@ -393,6 +410,7 @@ void MainWindow::updateUiState() {
     ui->actionProgram->setEnabled(!busy);
     ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
+    ui->actionCancel->setEnabled(busy);
 }
 
 void MainWindow::onRefreshProbesTriggered() {
@@ -458,10 +476,11 @@ void MainWindow::onEraseTriggered() {
 bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2) {
     if (!resolveChip(cfg.chipName)) return false;
     cfg.speedKhz = ui->spinSpeed->value();
+    cfg.probeId = ui->comboProbe->currentData().toString();
     cfg.autoSpeedEnabled = true;
-    cfg.eraseBeforeFlash = true;
-    cfg.verifyAfterFlash = true;
-    cfg.resetAfterFlash = true;
+    cfg.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
+    cfg.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
+    cfg.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
 
     AddressRange range1;
     AddressRange range2;
@@ -688,8 +707,8 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
-        ui->statusBar->showMessage(QString("Connected to %1 via SWD at %2 kHz").arg(chipInfo).arg(ui->spinSpeed->value()));
-        appendLog("INFO", QString("Connected to %1 via SWD at %2 kHz.").arg(chipInfo).arg(ui->spinSpeed->value()), "#2ecc71");
+        ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
+        appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()), "#2ecc71");
     } else {
         ui->statusBar->showMessage("Connection Failed");
         appendLog("ERROR", QString("Connection failed: %1").arg(chipInfo), "#e74c3c");
@@ -704,6 +723,7 @@ void MainWindow::onEngineDisconnected() {
 }
 
 void MainWindow::onSequenceStarted() {
+    m_sequenceRunning = true;
     m_isOperationRunning = true;
     ui->progressBar->setValue(0);
     updateUiState();
@@ -711,6 +731,7 @@ void MainWindow::onSequenceStarted() {
 }
 
 void MainWindow::onSequenceFinished(bool success, const QString& message) {
+    m_sequenceRunning = false;
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
@@ -763,4 +784,23 @@ void MainWindow::onChipTextCommitted() {
         if (idx >= 0) ui->comboManufacturer->setCurrentIndex(idx);  // keeps the chip name
         ui->comboModel->setEditText(canonical);
     });
+}
+
+void MainWindow::onCancelTriggered() {
+    appendLog("WARNING", "Stopping the running operation...", "#e67e22");
+    if (m_sequenceRunning) {
+        m_coordinator->cancelSequence();
+    } else {
+        m_engine->cancelCurrentOperation();
+    }
+}
+
+// Single commands (Erase, Reset, ...) end here; during a sequence the coordinator decides
+// what happens next and the window is updated from its own signals.
+void MainWindow::onEngineOperationFinished(bool success, const QString& message) {
+    Q_UNUSED(success);
+    Q_UNUSED(message);
+    if (m_sequenceRunning) return;
+    m_isOperationRunning = false;
+    updateUiState();
 }

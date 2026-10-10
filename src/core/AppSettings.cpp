@@ -26,6 +26,11 @@ UiSettings AppSettings::load(QSettings& settings) {
     v.slot1Enabled = settings.value("firmware/slot1Enabled", v.slot1Enabled).toBool();
     v.slot2Enabled = settings.value("firmware/slot2Enabled", v.slot2Enabled).toBool();
 
+    v.eraseBeforeFlash = settings.value("options/eraseBeforeFlash", v.eraseBeforeFlash).toBool();
+    v.verifyAfterFlash = settings.value("options/verifyAfterFlash", v.verifyAfterFlash).toBool();
+    v.resetAfterFlash = settings.value("options/resetAfterFlash", v.resetAfterFlash).toBool();
+    v.connectUnderReset = settings.value("options/connectUnderReset", v.connectUnderReset).toBool();
+
     v.geometry = settings.value("window/geometry").toByteArray();
     v.windowState = settings.value("window/state").toByteArray();
     return v;
@@ -47,6 +52,11 @@ void AppSettings::save(QSettings& settings, const UiSettings& v) {
     settings.setValue("target/customChipFiles", v.customChipFiles);
     settings.setValue("firmware/slot1Enabled", v.slot1Enabled);
     settings.setValue("firmware/slot2Enabled", v.slot2Enabled);
+
+    settings.setValue("options/eraseBeforeFlash", v.eraseBeforeFlash);
+    settings.setValue("options/verifyAfterFlash", v.verifyAfterFlash);
+    settings.setValue("options/resetAfterFlash", v.resetAfterFlash);
+    settings.setValue("options/connectUnderReset", v.connectUnderReset);
 
     settings.setValue("window/geometry", v.geometry);
     settings.setValue("window/state", v.windowState);

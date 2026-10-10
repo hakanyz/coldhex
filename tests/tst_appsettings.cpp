@@ -30,6 +30,10 @@ private slots:
         in.customChipFiles = QStringList{"C:/chips/APM32F1xx.yaml", "C:/chips/APM32F4.yaml"};
         in.slot1Enabled = false;
         in.slot2Enabled = true;
+        in.eraseBeforeFlash = false;
+        in.verifyAfterFlash = false;
+        in.resetAfterFlash = false;
+        in.connectUnderReset = true;
         in.geometry = QByteArray("\x01\x02\x03", 3);
         in.windowState = QByteArray("\x0A\x0B", 2);
 
@@ -53,6 +57,10 @@ private slots:
         QCOMPARE(out.customChipFiles, in.customChipFiles);
         QCOMPARE(out.slot1Enabled, false);
         QCOMPARE(out.slot2Enabled, true);
+        QCOMPARE(out.eraseBeforeFlash, false);
+        QCOMPARE(out.verifyAfterFlash, false);
+        QCOMPARE(out.resetAfterFlash, false);
+        QCOMPARE(out.connectUnderReset, true);
         QCOMPARE(out.geometry, in.geometry);
         QCOMPARE(out.windowState, in.windowState);
     }

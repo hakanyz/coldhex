@@ -209,6 +209,7 @@
     <addaction name="actionProgram"/>
     <addaction name="actionVerify"/>
     <addaction name="actionResetTarget"/>
+    <addaction name="actionCancel"/>
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
@@ -251,6 +252,7 @@
    <addaction name="actionProgram"/>
    <addaction name="actionVerify"/>
    <addaction name="actionResetTarget"/>
+   <addaction name="actionCancel"/>
    <addaction name="actionOpenHex"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -352,6 +354,55 @@
           </property>
           <property name="value">
            <number>1000</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupOptions">
+       <property name="title">
+        <string>Options</string>
+       </property>
+       <layout class="QVBoxLayout" name="layoutOptions">
+        <item>
+         <widget class="QCheckBox" name="checkEraseBeforeFlash">
+          <property name="text">
+           <string>Erase chip before programming</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkVerifyAfterFlash">
+          <property name="text">
+           <string>Verify after programming</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkResetAfterFlash">
+          <property name="text">
+           <string>Reset and run after programming</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="checkConnectUnderReset">
+          <property name="text">
+           <string>Connect under reset</string>
+          </property>
+          <property name="toolTip">
+           <string>Hold the target in reset while connecting. Helps when the chip sleeps, runs code that disables the debug pins, or cannot be reached otherwise.</string>
           </property>
          </widget>
         </item>
@@ -570,6 +621,14 @@
    </property>
    <property name="toolTip">
     <string>Reset and run target</string>
+   </property>
+  </action>
+  <action name="actionCancel">
+   <property name="text">
+    <string>Stop</string>
+   </property>
+   <property name="toolTip">
+    <string>Stop the running operation</string>
    </property>
   </action>
   <action name="actionOpenHex">

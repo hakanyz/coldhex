@@ -50,15 +50,14 @@ bool ProbeRsEngine::isBusy() const {
     return m_state != EngineState::Idle;
 }
 
-void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId,
-                                    const QString& chipDescriptionPath) {
-    const bool targetChanged = (chipName != m_currentChip) || (probeId != m_currentProbeId)
-                               || (chipDescriptionPath != m_currentChipDescriptionPath);
+void ProbeRsEngine::configureTarget(const TargetSettings& settings) {
+    const bool targetChanged = settings.chipName != m_target.chipName
+                               || settings.probeId != m_target.probeId
+                               || settings.chipDescriptionPath != m_target.chipDescriptionPath
+                               || settings.protocol != m_target.protocol
+                               || settings.connectUnderReset != m_target.connectUnderReset;
 
-    m_currentChip = chipName;
-    m_currentSpeedKhz = speedKhz;
-    m_currentProbeId = probeId;
-    m_currentChipDescriptionPath = chipDescriptionPath;
+    m_target = settings;
 
     if (targetChanged && m_connected && !isBusy()) {
         m_connected = false;
@@ -68,16 +67,24 @@ void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, 
 
 // Arguments every probe-rs command needs to find the right chip and probe.
 QStringList ProbeRsEngine::targetArgs() const {
+    return targetArgsFor(m_target);
+}
+
+QStringList ProbeRsEngine::targetArgsFor(const TargetSettings& target) {
     // --non-interactive: probe-rs must never wait for a probe choice on a terminal we do not have.
-    QStringList args = {"--chip", m_currentChip, "--non-interactive"};
-    if (!m_currentChipDescriptionPath.isEmpty()) {
-        args << "--chip-description-path" << m_currentChipDescriptionPath;
+    QStringList args = {"--chip", target.chipName, "--non-interactive"};
+    if (!target.chipDescriptionPath.isEmpty()) {
+        args << "--chip-description-path" << target.chipDescriptionPath;
     }
-    if (m_currentSpeedKhz > 0) {
-        args << "--speed" << QString::number(m_currentSpeedKhz);
+    args << "--protocol" << (target.protocol == DebugProtocol::Jtag ? "jtag" : "swd");
+    if (target.speedKhz > 0) {
+        args << "--speed" << QString::number(target.speedKhz);
     }
-    if (!m_currentProbeId.isEmpty()) {
-        args << "--probe" << m_currentProbeId;
+    if (!target.probeId.isEmpty()) {
+        args << "--probe" << target.probeId;
+    }
+    if (target.connectUnderReset) {
+        args << "--connect-under-reset";
     }
     return args;
 }
@@ -97,8 +104,12 @@ QStringList ProbeRsEngine::imageFormatArgs(const QString& filePath, uint32_t bas
 bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
     if (isBusy()) return false;
 
-    // Keep the chip description chosen by configureTarget(); only chip, speed and probe may change here.
-    configureTarget(chipName, speedKhz, probeId, m_currentChipDescriptionPath);
+    // Protocol, chip description and reset behaviour stay as set by configureTarget().
+    TargetSettings settings = m_target;
+    settings.chipName = chipName;
+    settings.speedKhz = speedKhz;
+    settings.probeId = probeId;
+    configureTarget(settings);
 
     QStringList args = QStringList{"info"} + targetArgs();
     runCommand(args, EngineState::Connecting, QString("Connecting to target: %1 (%2 kHz)").arg(chipName).arg(speedKhz));
@@ -303,7 +314,7 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
 
     if (completedState == EngineState::Connecting) {
         m_connected = success;
-        emit connected(success, success ? m_currentChip : "Connection failed.");
+        emit connected(success, success ? m_target.chipName : "Connection failed.");
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)

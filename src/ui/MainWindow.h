@@ -44,6 +44,8 @@ private slots:
     void onAddChipFileTriggered();
     void onClearChipFilesTriggered();
     void onSystemCheckTriggered();
+    void onCancelTriggered();
+    void onEngineOperationFinished(bool success, const QString& message);
     void onChipTextCommitted();
     void onOpenSlot1Clicked();
     void onOpenSlot2Clicked();
@@ -104,4 +106,5 @@ private:
     QString m_pendingChip;
 
     bool m_isOperationRunning = false;
+    bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
 };

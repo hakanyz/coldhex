@@ -11,8 +11,9 @@ class MockEngine : public IProgrammerEngine {
 public:
     explicit MockEngine(QObject* parent = nullptr) : IProgrammerEngine(parent) {}
 
-    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId, const QString& descriptionPath) override {
-        configured << QString("%1@%2:%3:%4").arg(chipName).arg(speedKhz).arg(probeId, descriptionPath);
+    void configureTarget(const TargetSettings& s) override {
+        configured << QString("%1@%2:%3:%4:%5:%6").arg(s.chipName).arg(s.speedKhz).arg(s.probeId, s.chipDescriptionPath)
+                          .arg(s.protocol == DebugProtocol::Jtag ? "jtag" : "swd").arg(s.connectUnderReset ? "cur" : "-");
     }
     void verifyFile(const QString& filePath, uint32_t baseAddress) override {
         commands << QString("verify:%1@0x%2").arg(filePath).arg(baseAddress, 0, 16);

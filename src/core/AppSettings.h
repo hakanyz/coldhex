@@ -25,6 +25,11 @@ struct UiSettings {
     bool slot1Enabled = true;
     bool slot2Enabled = true;
 
+    bool eraseBeforeFlash = true;
+    bool verifyAfterFlash = true;
+    bool resetAfterFlash = true;
+    bool connectUnderReset = false;
+
     QByteArray geometry;
     QByteArray windowState;
 };

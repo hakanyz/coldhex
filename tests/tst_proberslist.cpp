@@ -38,6 +38,36 @@ private slots:
         QVERIFY(ProbeRsEngine::parseProbeList("No debug probes were found.\n").isEmpty());
         QVERIFY(ProbeRsEngine::parseProbeList("The following debug probes were found:\n").isEmpty());
     }
+
+    void buildsTargetArguments() {
+        TargetSettings t;
+        t.chipName = "STM32F407VG";
+        t.speedKhz = 2000;
+        t.probeId = "0483:3748";
+        const QStringList args = ProbeRsEngine::targetArgsFor(t);
+
+        QCOMPARE(args, (QStringList{"--chip", "STM32F407VG", "--non-interactive", "--protocol", "swd",
+                                    "--speed", "2000", "--probe", "0483:3748"}));
+    }
+
+    void targetArgumentsReflectProtocolResetAndDescription() {
+        TargetSettings t;
+        t.chipName = "APM32F103CB";
+        t.speedKhz = 0;
+        t.protocol = DebugProtocol::Jtag;
+        t.connectUnderReset = true;
+        t.chipDescriptionPath = "C:/chips/apm32.yaml";
+        const QStringList args = ProbeRsEngine::targetArgsFor(t);
+
+        QVERIFY(args.contains("jtag"));
+        QVERIFY(!args.contains("swd"));
+        QVERIFY(args.contains("--connect-under-reset"));
+        QVERIFY(!args.contains("--speed"));
+        QVERIFY(!args.contains("--probe"));
+        const int i = args.indexOf("--chip-description-path");
+        QVERIFY(i >= 0);
+        QCOMPARE(args.at(i + 1), QString("C:/chips/apm32.yaml"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestProbeList)
