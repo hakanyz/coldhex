@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QHBoxLayout>
 #include <QMenuBar>
 #include <QMenu>
 #include <QKeySequence>
@@ -264,6 +265,8 @@ void MainWindow::setupUiCustomizations() {
         "QToolButton:pressed { background: #2a2c30; }"
         "QToolButton:disabled { color: #6b6f76; }");
 
+    setupConsoleTitleBar();
+
     // View menu: show or hide the side panel and the console (they can also be closed with their X).
     QMenu* viewMenu = new QMenu("View", this);
     QAction* toggleSettings = ui->dockTargetSettings->toggleViewAction();
@@ -493,6 +496,12 @@ void MainWindow::appendLog(const QString& levelStr, const QString& message, cons
     QString formatted = QString("<span style='color: #888888;'>[%1]</span> <span style='color: %2; font-weight: bold;'>%3:</span> <span style='color: #dcdcdc;'>%4</span>")
                             .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped().replace("\n", "<br>"));
     ui->textLog->appendHtml(formatted);
+
+    // A minimized console cannot be read: flag problems on its small title bar.
+    if (m_consoleMinimized && m_consoleTitle && (levelStr == "ERROR" || levelStr == "WARNING" || levelStr == "WARN")) {
+        m_consoleTitle->setText("Console Output  ●");
+        m_consoleTitle->setStyleSheet("font-weight: bold; color: #e5645a;");
+    }
 }
 
 void MainWindow::updateUiState() {
@@ -570,6 +579,7 @@ void MainWindow::changeEvent(QEvent* event) {
 }
 
 void MainWindow::onConnectTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
     const QString chip = ui->comboModel->currentText().trimmed();
     const uint32_t speed = ui->spinSpeed->value();
@@ -587,6 +597,7 @@ void MainWindow::onDisconnectTriggered() {
 }
 
 void MainWindow::onEraseTriggered() {
+    ensureConsoleVisible();
     if (QMessageBox::question(this, "Confirm Erase",
             "Are you sure you want to completely erase the target chip flash?",
             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
@@ -661,6 +672,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
 }
 
 void MainWindow::onProgramTriggered() {
+    ensureConsoleVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -674,6 +686,7 @@ void MainWindow::onProgramTriggered() {
 }
 
 void MainWindow::onVerifyTriggered() {
+    ensureConsoleVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -736,6 +749,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
 }
 
 void MainWindow::onResetTargetTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
     m_engine->resetTarget(false);
 }
@@ -999,6 +1013,7 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
 }
 
 void MainWindow::onReadTargetTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
 
     const QString chip = ui->comboModel->currentText().trimmed();
@@ -1163,4 +1178,72 @@ void MainWindow::onWiringGuideTriggered() {
     connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
     layout->addWidget(buttons);
     dialog->open();
+}
+
+// A slim title bar for the console with two small buttons: minimize (keeps only the bar, click
+// again to restore) and close (hides the console until the next action reopens it).
+void MainWindow::setupConsoleTitleBar() {
+    auto* bar = new QWidget(ui->dockConsoleOutput);
+    auto* layout = new QHBoxLayout(bar);
+    layout->setContentsMargins(8, 2, 4, 2);
+    layout->setSpacing(2);
+
+    m_consoleTitle = new QLabel("Console Output", bar);
+    m_consoleTitle->setStyleSheet("font-weight: bold;");
+    layout->addWidget(m_consoleTitle);
+    layout->addStretch();
+
+    const QString buttonStyle =
+        "QToolButton { border: none; border-radius: 3px; padding: 1px; }"
+        "QToolButton:hover { background: #3a3d42; }"
+        "QToolButton:pressed { background: #2a2c30; }";
+
+    m_btnConsoleMinimize = new QToolButton(bar);
+    m_btnConsoleMinimize->setIcon(QIcon(":/icons/dock/minimize.svg"));
+    m_btnConsoleMinimize->setIconSize(QSize(14, 14));
+    m_btnConsoleMinimize->setAutoRaise(true);
+    m_btnConsoleMinimize->setStyleSheet(buttonStyle);
+    m_btnConsoleMinimize->setToolTip("Minimize the console");
+    connect(m_btnConsoleMinimize, &QToolButton::clicked, this, [this]() { setConsoleMinimized(!m_consoleMinimized); });
+    layout->addWidget(m_btnConsoleMinimize);
+
+    auto* closeButton = new QToolButton(bar);
+    closeButton->setIcon(QIcon(":/icons/dock/close.svg"));
+    closeButton->setIconSize(QSize(14, 14));
+    closeButton->setAutoRaise(true);
+    closeButton->setStyleSheet(buttonStyle);
+    closeButton->setToolTip("Close the console (it opens again with the next action, or via View > Console Output)");
+    connect(closeButton, &QToolButton::clicked, ui->dockConsoleOutput, &QWidget::hide);
+    layout->addWidget(closeButton);
+
+    ui->dockConsoleOutput->setTitleBarWidget(bar);
+
+    // Showing the console again (View menu, F12) always shows it expanded.
+    connect(ui->dockConsoleOutput, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        if (visible && m_consoleMinimized) setConsoleMinimized(false);
+    });
+}
+
+void MainWindow::setConsoleMinimized(bool minimized) {
+    if (minimized == m_consoleMinimized) return;
+    QDockWidget* dock = ui->dockConsoleOutput;
+
+    if (minimized) {
+        m_consoleRestoreHeight = qMax(80, dock->height());
+        dock->widget()->setMaximumHeight(0);  // keep it laid out so the bar keeps the full width
+        resizeDocks({dock}, {dock->titleBarWidget()->sizeHint().height()}, Qt::Vertical);
+    } else {
+        dock->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
+        resizeDocks({dock}, {m_consoleRestoreHeight}, Qt::Vertical);
+        m_consoleTitle->setText("Console Output");
+        m_consoleTitle->setStyleSheet("font-weight: bold;");
+    }
+    m_consoleMinimized = minimized;
+    m_btnConsoleMinimize->setIcon(QIcon(minimized ? ":/icons/dock/restore.svg" : ":/icons/dock/minimize.svg"));
+    m_btnConsoleMinimize->setToolTip(minimized ? "Restore the console" : "Minimize the console");
+}
+
+// A closed console opens again when the user starts something. A minimized one stays small.
+void MainWindow::ensureConsoleVisible() {
+    if (!ui->dockConsoleOutput->isVisible()) ui->dockConsoleOutput->show();
 }
