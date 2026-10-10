@@ -10,6 +10,12 @@
 #include <QStandardPaths>
 #include <QCloseEvent>
 #include <QEvent>
+#include "engine/UsbScanner.h"
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <dbt.h>
+#endif
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -100,12 +106,28 @@ MainWindow::MainWindow(QWidget *parent)
 
     onRefreshProbesTriggered();
 
-    // Look for newly plugged-in probes every few seconds (the scan runs in the background).
+    // Newly plugged-in probes: Windows tells the program about every USB change (nativeEvent),
+    // on Linux a cheap look at /sys/bus/usb every second does the same job. A slow timer stays
+    // as a safety net on both.
     m_probeTimer = new QTimer(this);
     connect(m_probeTimer, &QTimer::timeout, this, [this]() {
-        if (!isMinimized() && !m_isOperationRunning && !m_engine->isBusy()) m_engine->requestProbeList();
+#ifndef Q_OS_WIN
+        const QList<UsbDevice> seen = UsbScanner::scan();
+        QStringList keys;
+        for (const UsbDevice& d : seen) keys << d.id();
+        if (keys != m_lastUsbKeys) {
+            m_lastUsbKeys = keys;
+            scheduleProbeRefresh();
+            return;
+        }
+#endif
+        if (m_probeSafetyTick++ % 5 == 0) scheduleProbeRefresh();
     });
-    m_probeTimer->start(3000);
+#ifdef Q_OS_WIN
+    m_probeTimer->start(5000);
+#else
+    m_probeTimer->start(1000);
+#endif
     restoreSettings();
     m_engine->requestChipList();
 
@@ -1012,3 +1034,28 @@ void MainWindow::onAboutTriggered() {
                 "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
             .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
 }
+
+// Asks probe-rs for the probe list now and once more shortly after: right after a probe is
+// plugged in, the driver may not be ready yet.
+void MainWindow::scheduleProbeRefresh() {
+    auto refresh = [this]() {
+        if (!m_isOperationRunning && !m_engine->isBusy()) m_engine->requestProbeList();
+    };
+    QTimer::singleShot(300, this, refresh);
+    QTimer::singleShot(1500, this, refresh);
+}
+
+#ifdef Q_OS_WIN
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
+    if (eventType == "windows_generic_MSG") {
+        const MSG* msg = static_cast<const MSG*>(message);
+        // Any device arriving, leaving or changing: look at the probes again.
+        if (msg->message == WM_DEVICECHANGE
+            && (msg->wParam == DBT_DEVNODES_CHANGED || msg->wParam == DBT_DEVICEARRIVAL
+                || msg->wParam == DBT_DEVICEREMOVECOMPLETE)) {
+            scheduleProbeRefresh();
+        }
+    }
+    return QMainWindow::nativeEvent(eventType, message, result);
+}
+#endif

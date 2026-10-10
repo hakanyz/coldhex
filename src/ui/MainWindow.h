@@ -28,6 +28,9 @@ public:
 protected:
     void closeEvent(QCloseEvent* event) override;
     void changeEvent(QEvent* event) override;
+#ifdef Q_OS_WIN
+    bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
+#endif
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
 
@@ -89,6 +92,7 @@ private:
     bool prepareEngine();
     bool prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2);
     void rebuildChipCatalog();
+    void scheduleProbeRefresh();
     QString currentProbeRsPath() const;
 
     Ui::MainWindow *ui;
@@ -120,6 +124,8 @@ private:
     QStringList m_lastProbeKeys;
     bool m_probeListSeen = false;
     QTimer* m_probeTimer = nullptr;
+    QStringList m_lastUsbKeys;
+    int m_probeSafetyTick = 0;
     QString m_pendingReadFile;       // set while a memory read is running
     uint32_t m_pendingReadBase = 0;
 };
