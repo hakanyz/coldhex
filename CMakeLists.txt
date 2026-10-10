@@ -48,6 +48,8 @@ set(SOURCES
     src/ui/ConsoleDock.cpp
     src/ui/ChipSelector.h
     src/ui/ChipSelector.cpp
+    src/ui/ProbeSelector.h
+    src/ui/ProbeSelector.cpp
     src/ui/SystemCheckDialog.cpp
     src/ui/Theme.h
     src/ui/Theme.cpp
