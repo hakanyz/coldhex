@@ -6,7 +6,7 @@ namespace {
 
 QString driverAdvice(const QString& family, bool windows) {
     if (!windows) {
-        return "Install the probe-rs udev rules (the ProbeDesk .deb does this), then unplug and re-plug the probe "
+        return "Install the probe-rs udev rules (the ColdHex .deb does this), then unplug and re-plug the probe "
                "and log out and in again. Your user must be allowed to access USB debug probes.";
     }
     if (family == "ST-Link") {
@@ -41,8 +41,8 @@ QList<CheckItem> SystemCheck::evaluate(const Input& in) {
                       (in.probeRsVersion.isEmpty() ? QString() : in.probeRsVersion + "\n") + in.probeRsPath});
     } else {
         items.append({CheckItem::Status::Error, "probe-rs not found",
-                      "ProbeDesk uses probe-rs to talk to the probe. Install probe-rs (probe.rs/docs/getting-started/installation) "
-                      "so that it is on PATH, or place probe-rs next to the ProbeDesk program."});
+                      "ColdHex uses probe-rs to talk to the probe. Install probe-rs (probe.rs/docs/getting-started/installation) "
+                      "so that it is on PATH, or place probe-rs next to the ColdHex program."});
     }
 
     if (in.usbProbes.isEmpty()) {

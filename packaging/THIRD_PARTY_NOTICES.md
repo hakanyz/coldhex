@@ -1,11 +1,11 @@
-# Third-party software shipped with ProbeDesk
+# Third-party software shipped with ColdHex
 
-ProbeDesk's installers include the following components. Their licence texts are
+ColdHex's installers include the following components. Their licence texts are
 available from the projects listed here or in this package.
 
 ## Qt 6 (GNU LGPL v3)
 
-ProbeDesk uses the Qt toolkit (Qt Core, Gui, Widgets and the libraries they need) under the
+ColdHex uses the Qt toolkit (Qt Core, Gui, Widgets and the libraries they need) under the
 terms of the GNU Lesser General Public License version 3. Qt is © The Qt Company Ltd. and
 other contributors, and is dynamically linked: the Qt libraries are separate files
 (`Qt6*.dll` / `libQt6*.so`) that you may replace with another build of the same Qt version.

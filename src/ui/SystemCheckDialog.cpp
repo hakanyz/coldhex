@@ -33,7 +33,7 @@ bool SystemCheckDialog::runCheck() {
 }
 
 QString SystemCheckDialog::toHtml(const QList<CheckItem>& items) {
-    QString html = "<h3>What ProbeDesk found on this computer</h3>";
+    QString html = "<h3>What ColdHex found on this computer</h3>";
     for (const CheckItem& item : items) {
         QString icon;
         QString color;
