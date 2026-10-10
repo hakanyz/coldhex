@@ -500,7 +500,36 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
         return false;
     }
 
-    return prepareEngine();
+    if (!prepareEngine()) return false;
+
+    // Refuse to write outside the chip's flash. Skipped when the memory layout is unknown.
+    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, cfg.chipName);
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(cfg.chipName, entry ? entry->descriptionFile : QString());
+    if (memory.isValid()) {
+        struct SlotCheck { const FirmwareSlot* slot; const AddressRange* range; };
+        for (const SlotCheck& c : {SlotCheck{&s1, &range1}, SlotCheck{&s2, &range2}}) {
+            if (!c.slot->enabled || memory.flashContains(c.range->start, c.range->size)) continue;
+
+            const MemoryRegion* flash = memory.mainFlash();
+            QString msg = QString("%1 (0x%2 - 0x%3) does not fit into the flash of %4")
+                              .arg(c.slot->label)
+                              .arg(c.range->start, 8, 16, QLatin1Char('0'))
+                              .arg(uint64_t(c.range->start) + c.range->size - 1, 8, 16, QLatin1Char('0'))
+                              .arg(cfg.chipName);
+            if (flash) {
+                msg += QString(" (0x%1 - 0x%2).")
+                           .arg(flash->start, 8, 16, QLatin1Char('0'))
+                           .arg(flash->end() - 1, 8, 16, QLatin1Char('0'));
+            } else {
+                msg += ".";
+            }
+            msg += "\nCheck the start address of the slot and the selected chip.";
+            appendLog("ERROR", msg, "#ff5555");
+            QMessageBox::warning(this, "Outside Flash Range", msg);
+            return false;
+        }
+    }
+    return true;
 }
 
 void MainWindow::onProgramTriggered() {

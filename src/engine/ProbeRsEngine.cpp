@@ -1,5 +1,6 @@
 #include "ProbeRsEngine.h"
 #include "ProbeRsLocator.h"
+#include "ChipDescription.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
@@ -111,7 +112,16 @@ bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, co
     settings.probeId = probeId;
     configureTarget(settings);
 
-    QStringList args = QStringList{"info"} + targetArgs();
+    // "probe-rs info" ignores --chip, so it would not notice a wrongly selected chip. Reading one
+    // word of RAM attaches with the selected chip and also works when flash read-out is locked.
+    QStringList args;
+    const ChipMemoryMap memory = queryMemoryMap(chipName, m_target.chipDescriptionPath);
+    if (const MemoryRegion* ram = memory.firstRam()) {
+        args = QStringList{"read"} + targetArgs()
+               + QStringList{"b32", QString("0x%1").arg(ram->start, 8, 16, QLatin1Char('0')), "1"};
+    } else {
+        args = QStringList{"info"} + targetArgs();
+    }
     runCommand(args, EngineState::Connecting, QString("Connecting to target: %1 (%2 kHz)").arg(chipName).arg(speedKhz));
     return true;
 }
@@ -354,4 +364,41 @@ void ProbeRsEngine::onChipListErrorOccurred(QProcess::ProcessError error) {
         emit chipListReady(false, {},
                            QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath));
     }
+}
+
+ChipMemoryMap ProbeRsEngine::parseChipInfo(const QString& output) {
+    // Lines look like "NVM: 0x08000000..0x08100000 (1.0 MiB)" or "RAM: ...".
+    static const QRegularExpression regionRegex(R"(^\s*(NVM|RAM):\s*(0x[0-9A-Fa-f]+)\.\.(0x[0-9A-Fa-f]+))");
+
+    ChipMemoryMap map;
+    const QStringList lines = output.split('\n');
+    for (const QString& line : lines) {
+        const QRegularExpressionMatch m = regionRegex.match(line);
+        if (!m.hasMatch()) continue;
+
+        MemoryRegion r;
+        r.nonVolatile = (m.captured(1) == "NVM");
+        r.start = m.captured(2).toULongLong(nullptr, 16);
+        const uint64_t end = m.captured(3).toULongLong(nullptr, 16);
+        r.size = end > r.start ? end - r.start : 0;
+        if (r.size > 0) map.regions.append(r);
+    }
+    return map;
+}
+
+ChipMemoryMap ProbeRsEngine::queryMemoryMap(const QString& chipName, const QString& chipDescriptionPath) {
+    if (chipName.isEmpty()) return {};
+
+    if (!chipDescriptionPath.isEmpty()) {
+        return ChipDescription::memoryMapFromFile(chipDescriptionPath, chipName);
+    }
+
+    QProcess proc;
+    proc.start(m_executablePath, {"chip", "info", chipName});
+    if (!proc.waitForFinished(5000)) {
+        proc.kill();
+        return {};
+    }
+    if (proc.exitCode() != 0) return {};
+    return parseChipInfo(QString::fromUtf8(proc.readAllStandardOutput()));
 }

@@ -21,6 +21,7 @@ public:
     ~ProbeRsEngine() override;
 
     void configureTarget(const TargetSettings& settings) override;
+    ChipMemoryMap queryMemoryMap(const QString& chipName, const QString& chipDescriptionPath) override;
     bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) override;
     void disconnectTarget() override;
     bool isConnected() const override;
@@ -40,6 +41,9 @@ public:
 
     // Parses the output of "probe-rs list".
     static QList<ProbeInfo> parseProbeList(const QString& output);
+
+    // Parses the output of "probe-rs chip info <name>".
+    static ChipMemoryMap parseChipInfo(const QString& output);
 
     // Parses the output of "probe-rs chip list".
     static QList<ChipEntry> parseChipList(const QString& output);

@@ -38,6 +38,7 @@ public:
     void resetTarget(bool) override { commands << "reset"; m_busy = true; }
     void cancelCurrentOperation() override { commands << "cancel"; m_busy = false; }
 
+    ChipMemoryMap queryMemoryMap(const QString&, const QString&) override { return memory; }
     void requestChipList() override { emit chipListReady(true, chips, QString()); }
     QList<ProbeInfo> listAvailableProbes() override { return {}; }
 
@@ -54,6 +55,7 @@ public:
     QStringList commands;
     QStringList configured;
     QList<ChipEntry> chips;
+    ChipMemoryMap memory;
 
 private:
     bool m_connected = false;

@@ -193,6 +193,7 @@ if(PROBEDESK_BUILD_TESTS)
     add_executable(tst_probelist
         tests/tst_proberslist.cpp
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
@@ -206,6 +207,7 @@ if(PROBEDESK_BUILD_TESTS)
         src/core/ChipCatalog.cpp
         src/core/ChipCatalog.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
@@ -239,6 +241,7 @@ if(PROBEDESK_BUILD_TESTS)
         src/engine/UsbScanner.cpp
         src/engine/UsbScanner.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsEngine.h
         src/engine/ProbeRsLocator.cpp
         src/engine/IProgrammerEngine.h

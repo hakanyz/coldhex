@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QList>
 #include <cstdint>
+#include "ChipMemory.h"
 
 enum class EngineLogLevel {
     Debug,
@@ -57,6 +58,8 @@ public:
     // Sets chip, speed and probe used by the following commands. Switching chip or
     // probe drops an existing connection.
     virtual void configureTarget(const TargetSettings& settings) = 0;
+    // Memory layout of the configured chip (empty map when unknown). May run a short command.
+    virtual ChipMemoryMap queryMemoryMap(const QString& chipName, const QString& chipDescriptionPath) = 0;
     virtual bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
     virtual void disconnectTarget() = 0;
     virtual bool isConnected() const = 0;
