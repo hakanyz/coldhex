@@ -99,6 +99,13 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     onRefreshProbesTriggered();
+
+    // Look for newly plugged-in probes every few seconds (the scan runs in the background).
+    m_probeTimer = new QTimer(this);
+    connect(m_probeTimer, &QTimer::timeout, this, [this]() {
+        if (!isMinimized() && !m_isOperationRunning && !m_engine->isBusy()) m_engine->requestProbeList();
+    });
+    m_probeTimer->start(3000);
     restoreSettings();
     m_engine->requestChipList();
 
@@ -445,8 +452,10 @@ void MainWindow::onProbeListReady(bool success, const QList<ProbeInfo>& probes, 
 
     QStringList keys;
     for (const ProbeInfo& p : probes) keys << p.selector();
-    const bool changed = (keys != m_lastProbeKeys);
+    const bool changed = !m_probeListSeen || (keys != m_lastProbeKeys);
+    m_probeListSeen = true;
     m_lastProbeKeys = keys;
+    if (!changed && !verbose) return;  // leave the box alone, an open drop-down would close
 
     const QString previous = ui->comboProbe->currentText();
     ui->comboProbe->clear();

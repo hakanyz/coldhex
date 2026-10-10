@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QTimer>
 #include <QStringListModel>
 #include <QComboBox>
 #include <QLabel>
@@ -117,6 +118,8 @@ private:
     bool m_probeRefreshVerbose = false;
     bool m_lastProbeError = false;
     QStringList m_lastProbeKeys;
+    bool m_probeListSeen = false;
+    QTimer* m_probeTimer = nullptr;
     QString m_pendingReadFile;       // set while a memory read is running
     uint32_t m_pendingReadBase = 0;
 };
