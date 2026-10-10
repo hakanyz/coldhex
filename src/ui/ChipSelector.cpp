@@ -82,7 +82,7 @@ bool ChipSelector::resolve(QString& chip) {
     if (!m_builtinChipsLoaded) return true;
 
     const QString msg = QString("'%1' is not a chip name known to probe-rs. Pick one from the list.").arg(chip);
-    log("ERROR", msg, "#ff5555");
+    log("ERROR", msg);
     QMessageBox::warning(m_parent, "Unknown Chip", msg);
     return false;
 }
@@ -94,7 +94,7 @@ void ChipSelector::onChipListReady(bool success, const QList<ChipEntry>& chips, 
         log("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
     } else {
         m_builtinChips.clear();
-        log("ERROR", QString("Chip list unavailable: %1").arg(error), "#ff5555");
+        log("ERROR", QString("Chip list unavailable: %1").arg(error));
         log("WARNING", "Chip names cannot be checked; type the exact probe-rs chip name.");
     }
     rebuildCatalog();
@@ -133,7 +133,7 @@ void ChipSelector::rebuildCatalog() {
         QString error;
         const QStringList names = ChipDescription::variantNamesFromFile(path, &family, &error);
         if (names.isEmpty()) {
-            log("ERROR", error, "#ff5555");
+            log("ERROR", error);
             continue;
         }
         for (const QString& name : names) {
@@ -186,7 +186,7 @@ void ChipSelector::addChipFile() {
     QString family;
     QString error;
     if (ChipDescription::variantNamesFromFile(path, &family, &error).isEmpty()) {
-        log("ERROR", error, "#ff5555");
+        log("ERROR", error);
         QMessageBox::warning(m_parent, "Invalid Chip Description", error);
         return;
     }

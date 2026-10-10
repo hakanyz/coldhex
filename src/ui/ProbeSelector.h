@@ -32,7 +32,7 @@ public:
     void restore(const QString& label);
 
 signals:
-    void message(const QString& level, const QString& text, const QString& colorHex);
+    void message(const QString& level, const QString& text);
     void status(const QString& text, int timeoutMs);
 
 protected:

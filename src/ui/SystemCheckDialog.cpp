@@ -1,4 +1,5 @@
 #include "SystemCheckDialog.h"
+#include "Theme.h"
 #include <QApplication>
 #include <QDialogButtonBox>
 #include <QPushButton>
@@ -38,10 +39,10 @@ QString SystemCheckDialog::toHtml(const QList<CheckItem>& items) {
         QString icon;
         QString color;
         switch (item.status) {
-        case CheckItem::Status::Ok:      icon = "&#10004;"; color = "#2e9e5b"; break;
-        case CheckItem::Status::Info:    icon = "&#8505;";  color = "#4a8fd4"; break;
-        case CheckItem::Status::Warning: icon = "&#9888;";  color = "#d98c1f"; break;
-        case CheckItem::Status::Error:   icon = "&#10006;"; color = "#d9423a"; break;
+        case CheckItem::Status::Ok:      icon = "&#10004;"; color = Theme::hex(Theme::Color::logSuccess); break;
+        case CheckItem::Status::Info:    icon = "&#8505;";  color = Theme::hex(Theme::Color::logInfo); break;
+        case CheckItem::Status::Warning: icon = "&#9888;";  color = Theme::hex(Theme::Color::logWarning); break;
+        case CheckItem::Status::Error:   icon = "&#10006;"; color = Theme::hex(Theme::Color::logError); break;
         }
         html += QString("<p><span style='color:%1; font-size:15px;'><b>%2 %3</b></span>")
                     .arg(color, icon, item.title.toHtmlEscaped());

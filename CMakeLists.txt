@@ -313,4 +313,13 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_firmwarefiles PRIVATE src)
     target_link_libraries(tst_firmwarefiles PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_firmwarefiles COMMAND tst_firmwarefiles)
+
+    add_executable(tst_theme
+        tests/tst_theme.cpp
+        src/ui/Theme.cpp
+        src/ui/Theme.h
+    )
+    target_include_directories(tst_theme PRIVATE src)
+    target_link_libraries(tst_theme PRIVATE Qt6::Widgets Qt6::Test)
+    add_test(NAME tst_theme COMMAND tst_theme)
 endif()

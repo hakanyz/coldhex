@@ -71,7 +71,7 @@ private:
     void setupUiCustomizations();
     void setupToolBarWidgets();
     void updateUiState();
-    void appendLog(const QString& levelStr, const QString& message, const QString& colorHex = "#dcdcdc");
+    void appendLog(const QString& levelStr, const QString& message);
     void loadFileIntoSlot(int slotIndex, const QString& filePath);
     void updateMemoryViewer();
     void restoreSettings();

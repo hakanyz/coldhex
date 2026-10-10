@@ -22,9 +22,9 @@ public:
     ConsoleDock(QMainWindow* window, QDockWidget* dock, QPlainTextEdit* log,
                 QAction* clearAction, QAction* saveAction);
 
-    // Adds a line such as "[12:00:01] ERROR: text". `level` is shown as is; "ERROR", "WARNING" and
-    // "WARN" also flag a minimized console.
-    void append(const QString& level, const QString& message, const QString& colorHex = "#dcdcdc");
+    // Adds a line such as "[12:00:01] ERROR: text", colored by its level (see Theme::logColor). "ERROR",
+    // "WARNING" and "WARN" also flag a minimized console.
+    void append(const QString& level, const QString& message);
 
     // Shows the console if it was closed (a minimized console stays minimized).
     void ensureVisible();
