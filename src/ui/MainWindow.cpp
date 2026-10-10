@@ -9,6 +9,15 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QHBoxLayout>
+#include <QMenuBar>
+#include <QMenu>
+#include <QKeySequence>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QTextBrowser>
+#include <QVBoxLayout>
+#include <QPushButton>
 #include <QIcon>
 #include <QEvent>
 #include "engine/UsbScanner.h"
@@ -80,6 +89,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
     connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
+    connect(ui->actionWiringGuide, &QAction::triggered, this, &MainWindow::onWiringGuideTriggered);
     connect(ui->actionCancel, &QAction::triggered, this, &MainWindow::onCancelTriggered);
     connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
@@ -230,8 +240,8 @@ void MainWindow::setupUiCustomizations() {
     ui->textLog->setFont(monoFont);
 
     // DockWidget properties
-    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
+    ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetClosable);
 
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
     ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
@@ -254,6 +264,32 @@ void MainWindow::setupUiCustomizations() {
         "QToolButton:hover { background: #3a3d42; border-color: #4a4e55; }"
         "QToolButton:pressed { background: #2a2c30; }"
         "QToolButton:disabled { color: #6b6f76; }");
+
+    setupConsoleTitleBar();
+
+    // View menu: show or hide the side panel and the console (they can also be closed with their X).
+    QMenu* viewMenu = new QMenu("View", this);
+    QAction* toggleSettings = ui->dockTargetSettings->toggleViewAction();
+    toggleSettings->setText("Target Settings");
+    QAction* toggleConsole = ui->dockConsoleOutput->toggleViewAction();
+    toggleConsole->setText("Console Output");
+    toggleConsole->setShortcut(QKeySequence("F12"));
+    viewMenu->addAction(toggleSettings);
+    viewMenu->addAction(toggleConsole);
+    menuBar()->insertMenu(ui->menuHelp->menuAction(), viewMenu);
+
+    // Right-click in the console: Copy, Select All, Clear and Save. Ctrl+L clears it as well.
+    ui->textLog->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->textLog, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        QMenu* menu = ui->textLog->createStandardContextMenu();
+        menu->addSeparator();
+        menu->addAction(ui->actionClearLog);
+        menu->addAction(ui->actionSaveLog);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->popup(ui->textLog->mapToGlobal(pos));
+    });
+    ui->actionClearLog->setShortcut(QKeySequence("Ctrl+L"));
+    ui->actionClearLog->setToolTip("Clear the console output (Ctrl+L)");
 
     ui->statusBar->showMessage("Ready");
 }
@@ -458,8 +494,14 @@ bool MainWindow::resolveChip(QString& chip) {
 void MainWindow::appendLog(const QString& levelStr, const QString& message, const QString& colorHex) {
     QString timeStr = QDateTime::currentDateTime().toString("HH:mm:ss");
     QString formatted = QString("<span style='color: #888888;'>[%1]</span> <span style='color: %2; font-weight: bold;'>%3:</span> <span style='color: #dcdcdc;'>%4</span>")
-                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped());
+                            .arg(timeStr, colorHex, levelStr, message.toHtmlEscaped().replace("\n", "<br>"));
     ui->textLog->appendHtml(formatted);
+
+    // A minimized console cannot be read: flag problems on its small title bar.
+    if (m_consoleMinimized && m_consoleTitle && (levelStr == "ERROR" || levelStr == "WARNING" || levelStr == "WARN")) {
+        m_consoleTitle->setText("Console Output  ●");
+        m_consoleTitle->setStyleSheet("font-weight: bold; color: #e5645a;");
+    }
 }
 
 void MainWindow::updateUiState() {
@@ -537,11 +579,13 @@ void MainWindow::changeEvent(QEvent* event) {
 }
 
 void MainWindow::onConnectTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
     const QString chip = ui->comboModel->currentText().trimmed();
     const uint32_t speed = ui->spinSpeed->value();
     const QString probe = ui->comboProbe->currentData().toString();
 
+    m_manualConnect = true;
     m_isOperationRunning = true;
     updateUiState();
     appendLog("INFO", QString("Connecting to %1 via %2 at %3 kHz...").arg(chip, ui->comboInterface->currentText()).arg(speed));
@@ -553,6 +597,7 @@ void MainWindow::onDisconnectTriggered() {
 }
 
 void MainWindow::onEraseTriggered() {
+    ensureConsoleVisible();
     if (QMessageBox::question(this, "Confirm Erase",
             "Are you sure you want to completely erase the target chip flash?",
             QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
@@ -627,6 +672,7 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
 }
 
 void MainWindow::onProgramTriggered() {
+    ensureConsoleVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -640,6 +686,7 @@ void MainWindow::onProgramTriggered() {
 }
 
 void MainWindow::onVerifyTriggered() {
+    ensureConsoleVisible();
     TargetConfig cfg;
     FirmwareSlot s1;
     FirmwareSlot s2;
@@ -702,6 +749,7 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
 }
 
 void MainWindow::onResetTargetTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
     m_engine->resetTarget(false);
 }
@@ -840,8 +888,18 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
         appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()), "#2ecc71");
     } else {
         ui->statusBar->showMessage("Connection Failed");
-        appendLog("ERROR", QString("Connection failed: %1").arg(chipInfo), "#e74c3c");
+        appendLog("ERROR", "Connection failed.", "#e74c3c");
+
+        // The user pressed Connect: explain what is probably wrong and offer the wiring guide.
+        // (A failed connect inside a flash sequence is handled by the sequence itself.)
+        if (m_manualConnect) {
+            QMessageBox box(QMessageBox::Warning, "Connection Failed", chipInfo, QMessageBox::Ok, this);
+            QPushButton* guide = box.addButton("Wiring Guide...", QMessageBox::HelpRole);
+            box.exec();
+            if (box.clickedButton() == guide) onWiringGuideTriggered();
+        }
     }
+    m_manualConnect = false;
 }
 
 void MainWindow::onEngineDisconnected() {
@@ -955,6 +1013,7 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
 }
 
 void MainWindow::onReadTargetTriggered() {
+    ensureConsoleVisible();
     if (!prepareEngine()) return;
 
     const QString chip = ui->comboModel->currentText().trimmed();
@@ -1079,3 +1138,112 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
     return QMainWindow::nativeEvent(eventType, message, result);
 }
 #endif
+
+void MainWindow::onWiringGuideTriggered() {
+    auto* dialog = new QDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle("Wiring Guide");
+    dialog->resize(560, 520);
+
+    auto* view = new QTextBrowser(dialog);
+    view->setOpenExternalLinks(true);
+    view->setHtml(
+        "<h3>Connecting the probe to the target board</h3>"
+        "<p>Pin positions differ between probes and boards. Follow the pin labels of your probe and "
+        "your board; this guide only explains what each signal is for.</p>"
+        "<h4>SWD (2 wires + ground)</h4>"
+        "<table cellpadding='4' border='0'>"
+        "<tr><td><b>GND</b></td><td>Common ground. <b>Always connect it</b>, an unconnected ground is the most common cause of failures.</td></tr>"
+        "<tr><td><b>SWDIO</b></td><td>Bidirectional data line. Goes to the SWDIO pin of the chip.</td></tr>"
+        "<tr><td><b>SWCLK</b></td><td>Clock. Goes to the SWCLK pin of the chip. SWDIO and SWCLK are easy to swap.</td></tr>"
+        "<tr><td><b>3V3 / VTref</b></td><td>Tells the probe the voltage of the target. Many probes only measure it; the board needs its own power.</td></tr>"
+        "<tr><td><b>NRST</b></td><td>Optional reset line. Needed for <i>Connect under reset</i> and helps with chips that disable their debug pins.</td></tr>"
+        "</table>"
+        "<h4>JTAG</h4>"
+        "<p>TMS, TCK, TDI and TDO instead of SWDIO and SWCLK, plus GND, VTref and optionally NRST/TRST.</p>"
+        "<h4>If Connect fails</h4>"
+        "<ul>"
+        "<li>Check GND first, then swap SWDIO and SWCLK if unsure.</li>"
+        "<li>Make sure the board is powered and uses the same voltage level as the probe (3.3 V).</li>"
+        "<li>Keep the wires short; with long wires lower the speed (e.g. 500 kHz).</li>"
+        "<li>Try <i>Connect under reset</i> and connect NRST.</li>"
+        "<li>Check that the right chip and interface (SWD/JTAG) are selected.</li>"
+        "</ul>"
+        "<p>With a probe that works but a board that does not answer, ColdHex reports that the target "
+        "does not respond. That points to wiring, power or chip settings, not to the probe.</p>");
+
+    auto* layout = new QVBoxLayout(dialog);
+    layout->addWidget(view);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close);
+    layout->addWidget(buttons);
+    dialog->open();
+}
+
+// A slim title bar for the console with two small buttons: minimize (keeps only the bar, click
+// again to restore) and close (hides the console until the next action reopens it).
+void MainWindow::setupConsoleTitleBar() {
+    auto* bar = new QWidget(ui->dockConsoleOutput);
+    auto* layout = new QHBoxLayout(bar);
+    layout->setContentsMargins(8, 2, 4, 2);
+    layout->setSpacing(2);
+
+    m_consoleTitle = new QLabel("Console Output", bar);
+    m_consoleTitle->setStyleSheet("font-weight: bold;");
+    layout->addWidget(m_consoleTitle);
+    layout->addStretch();
+
+    const QString buttonStyle =
+        "QToolButton { border: none; border-radius: 3px; padding: 1px; }"
+        "QToolButton:hover { background: #3a3d42; }"
+        "QToolButton:pressed { background: #2a2c30; }";
+
+    m_btnConsoleMinimize = new QToolButton(bar);
+    m_btnConsoleMinimize->setIcon(QIcon(":/icons/dock/minimize.svg"));
+    m_btnConsoleMinimize->setIconSize(QSize(14, 14));
+    m_btnConsoleMinimize->setAutoRaise(true);
+    m_btnConsoleMinimize->setStyleSheet(buttonStyle);
+    m_btnConsoleMinimize->setToolTip("Minimize the console");
+    connect(m_btnConsoleMinimize, &QToolButton::clicked, this, [this]() { setConsoleMinimized(!m_consoleMinimized); });
+    layout->addWidget(m_btnConsoleMinimize);
+
+    auto* closeButton = new QToolButton(bar);
+    closeButton->setIcon(QIcon(":/icons/dock/close.svg"));
+    closeButton->setIconSize(QSize(14, 14));
+    closeButton->setAutoRaise(true);
+    closeButton->setStyleSheet(buttonStyle);
+    closeButton->setToolTip("Close the console (it opens again with the next action, or via View > Console Output)");
+    connect(closeButton, &QToolButton::clicked, ui->dockConsoleOutput, &QWidget::hide);
+    layout->addWidget(closeButton);
+
+    ui->dockConsoleOutput->setTitleBarWidget(bar);
+
+    // Showing the console again (View menu, F12) always shows it expanded.
+    connect(ui->dockConsoleOutput, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        if (visible && m_consoleMinimized) setConsoleMinimized(false);
+    });
+}
+
+void MainWindow::setConsoleMinimized(bool minimized) {
+    if (minimized == m_consoleMinimized) return;
+    QDockWidget* dock = ui->dockConsoleOutput;
+
+    if (minimized) {
+        m_consoleRestoreHeight = qMax(80, dock->height());
+        dock->widget()->setMaximumHeight(0);  // keep it laid out so the bar keeps the full width
+        resizeDocks({dock}, {dock->titleBarWidget()->sizeHint().height()}, Qt::Vertical);
+    } else {
+        dock->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
+        resizeDocks({dock}, {m_consoleRestoreHeight}, Qt::Vertical);
+        m_consoleTitle->setText("Console Output");
+        m_consoleTitle->setStyleSheet("font-weight: bold;");
+    }
+    m_consoleMinimized = minimized;
+    m_btnConsoleMinimize->setIcon(QIcon(minimized ? ":/icons/dock/restore.svg" : ":/icons/dock/minimize.svg"));
+    m_btnConsoleMinimize->setToolTip(minimized ? "Restore the console" : "Minimize the console");
+}
+
+// A closed console opens again when the user starts something. A minimized one stays small.
+void MainWindow::ensureConsoleVisible() {
+    if (!ui->dockConsoleOutput->isVisible()) ui->dockConsoleOutput->show();
+}

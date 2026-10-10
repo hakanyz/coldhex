@@ -48,6 +48,8 @@ set(SOURCES
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
+    src/engine/ConnectionAdvice.h
+    src/engine/ConnectionAdvice.cpp
 )
 
 qt_add_executable(coldhex
@@ -57,10 +59,11 @@ qt_add_executable(coldhex
 
 # Application icon: embedded in the Windows executable and available to the program as a Qt resource.
 file(GLOB TOOLBAR_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/toolbar/*.svg)
+file(GLOB DOCK_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/dock/*.svg)
 qt_add_resources(coldhex "app_icons"
     PREFIX "/icons"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS}
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS} ${DOCK_ICONS}
 )
 if(WIN32)
     set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
@@ -213,6 +216,7 @@ if(COLDHEX_BUILD_TESTS)
     add_executable(tst_probelist
         tests/tst_proberslist.cpp
         src/engine/ProbeRsEngine.cpp
+        src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
@@ -227,6 +231,7 @@ if(COLDHEX_BUILD_TESTS)
         src/core/ChipCatalog.cpp
         src/core/ChipCatalog.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
@@ -261,6 +266,7 @@ if(COLDHEX_BUILD_TESTS)
         src/engine/UsbScanner.cpp
         src/engine/UsbScanner.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsEngine.h
         src/engine/ProbeRsLocator.cpp
@@ -280,4 +286,13 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_usbscanner PRIVATE src)
     target_link_libraries(tst_usbscanner PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_usbscanner COMMAND tst_usbscanner)
+
+    add_executable(tst_connectionadvice
+        tests/tst_connectionadvice.cpp
+        src/engine/ConnectionAdvice.cpp
+        src/engine/ConnectionAdvice.h
+    )
+    target_include_directories(tst_connectionadvice PRIVATE src)
+    target_link_libraries(tst_connectionadvice PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_connectionadvice COMMAND tst_connectionadvice)
 endif()

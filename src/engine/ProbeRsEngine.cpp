@@ -1,6 +1,7 @@
 #include "ProbeRsEngine.h"
 #include "ProbeRsLocator.h"
 #include "ChipDescription.h"
+#include "ConnectionAdvice.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
@@ -264,6 +265,7 @@ void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState,
     m_cancelRequested = false;
     m_stdoutBuffer.clear();
     m_stderrBuffer.clear();
+    m_outputLines.clear();
     m_currentActionDescription = actionDescription;
 
     emit operationStarted(actionDescription);
@@ -302,6 +304,8 @@ void ProbeRsEngine::onProcessReadyReadStdErr() {
 void ProbeRsEngine::parseOutputLine(const QString& line, bool isError) {
     if (line.isEmpty()) return;
 
+    if (m_outputLines.size() < 200) m_outputLines << line;
+
     auto match = m_progressRegex.match(line);
     if (match.hasMatch()) {
         int percent = match.captured(1).toInt();
@@ -334,9 +338,17 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     EngineState completedState = m_state;
     m_state = EngineState::Idle;
 
+    // For a failed command explain the probable cause in plain words.
+    QString advice;
+    if (!success) {
+        advice = ConnectionAdvice::explain(m_outputLines.join('\n'));
+        if (advice.isEmpty() && completedState == EngineState::Connecting) advice = ConnectionAdvice::generic();
+        if (!advice.isEmpty()) emit logMessage(advice, EngineLogLevel::Warning);
+    }
+
     if (completedState == EngineState::Connecting) {
         m_connected = success;
-        emit connected(success, success ? m_target.chipName : "Connection failed.");
+        emit connected(success, success ? m_target.chipName : advice);
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)

@@ -79,6 +79,7 @@ private:
     bool m_cancelRequested = false;
     QByteArray m_stdoutBuffer;
     QByteArray m_stderrBuffer;
+    QStringList m_outputLines;  // output of the running command, used to explain failures
 
     TargetSettings m_target;
     QString m_currentActionDescription;
