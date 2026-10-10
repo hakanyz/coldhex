@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QIcon>
 #include <QEvent>
 #include "engine/UsbScanner.h"
 #ifdef Q_OS_WIN
@@ -234,6 +235,25 @@ void MainWindow::setupUiCustomizations() {
 
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
     ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
+
+    // Toolbar: small icons with the label under them, and visible button states.
+    struct ActionIcon { QAction* action; const char* file; };
+    const ActionIcon icons[] = {
+        {ui->actionConnect, "connect"},   {ui->actionDisconnect, "disconnect"},
+        {ui->actionRead, "read"},         {ui->actionErase, "erase"},
+        {ui->actionProgram, "program"},   {ui->actionVerify, "verify"},
+        {ui->actionResetTarget, "reset"}, {ui->actionCancel, "stop"},
+        {ui->actionOpenHex, "open"},
+    };
+    for (const ActionIcon& a : icons) {
+        a.action->setIcon(QIcon(QString(":/icons/toolbar/%1.svg").arg(a.file)));
+    }
+    ui->mainToolBar->setIconSize(QSize(18, 18));
+    ui->mainToolBar->setStyleSheet(
+        "QToolButton { padding: 3px 8px; border: 1px solid transparent; border-radius: 4px; }"
+        "QToolButton:hover { background: #3a3d42; border-color: #4a4e55; }"
+        "QToolButton:pressed { background: #2a2c30; }"
+        "QToolButton:disabled { color: #6b6f76; }");
 
     ui->statusBar->showMessage("Ready");
 }
