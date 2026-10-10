@@ -26,6 +26,8 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private slots:
     // Toolbar Actions
@@ -46,6 +48,7 @@ private slots:
     void onSystemCheckTriggered();
     void onReadTargetTriggered();
     void onSaveLogTriggered();
+    void onAboutTriggered();
     void onCancelTriggered();
     void onEngineOperationFinished(bool success, const QString& message);
     void onChipTextCommitted();

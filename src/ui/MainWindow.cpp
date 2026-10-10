@@ -9,6 +9,11 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QApplication>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -30,6 +35,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+    setAcceptDrops(true);
 
     setupUiCustomizations();
     setupToolBarWidgets();
@@ -54,6 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
     connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
     connect(ui->actionSaveLog, &QAction::triggered, this, &MainWindow::onSaveLogTriggered);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
@@ -904,4 +911,61 @@ void MainWindow::onSaveLogTriggered() {
     }
     out.write(ui->textLog->toPlainText().toUtf8());
     appendLog("INFO", "Log saved to " + file);
+}
+
+namespace {
+
+bool isFirmwareFile(const QString& path) {
+    const FileFormat format = HexParser::detectFormat(path);
+    return format == FileFormat::IntelHex || format == FileFormat::RawBinary || format == FileFormat::Elf;
+}
+
+// Names that usually belong to a bootloader: boot.hex, my_bootloader.bin, app_bl.elf ...
+bool looksLikeBootloader(const QString& path) {
+    const QString name = QFileInfo(path).completeBaseName().toLower();
+    return name.contains("boot") || name.endsWith("_bl") || name.startsWith("bl_") || name == "bl";
+}
+
+}  // namespace
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
+    if (!event->mimeData()->hasUrls()) return;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+}
+
+// Dropped firmware files go to the slots: bootloader-like names to Slot 1, everything else to
+// Slot 2. Two files without such a name fill Slot 1 and Slot 2 in the order they were dropped.
+void MainWindow::dropEvent(QDropEvent* event) {
+    QStringList files;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) files << url.toLocalFile();
+    }
+    if (files.isEmpty()) return;
+
+    const bool twoPlainFiles = files.size() == 2 && !looksLikeBootloader(files[0]) && !looksLikeBootloader(files[1]);
+    for (int i = 0; i < files.size() && i < 2; ++i) {
+        const QString& file = files[i];
+        const bool toSlot1 = twoPlainFiles ? (i == 0) : looksLikeBootloader(file);
+        QLineEdit* edit = toSlot1 ? ui->editSlot1Path : ui->editSlot2Path;
+        QCheckBox* check = toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled;
+        edit->setText(file);
+        check->setChecked(true);
+        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(file).fileName(), toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
+    }
+    if (files.size() > 2) appendLog("WARNING", "Only the first two dropped files were used.");
+    event->acceptProposedAction();
+}
+
+void MainWindow::onAboutTriggered() {
+    QMessageBox::about(this, "About ProbeDesk",
+        QString("<h3>ProbeDesk %1</h3>"
+                "<p>Flash and manage ARM Cortex-M microcontrollers through ST-Link, J-Link and CMSIS-DAP probes. "
+                "Flashing is done by <a href='https://probe.rs'>probe-rs</a>.</p>"
+                "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
+            .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
 }
