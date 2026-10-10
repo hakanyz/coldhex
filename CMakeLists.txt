@@ -56,10 +56,11 @@ qt_add_executable(coldhex
 )
 
 # Application icon: embedded in the Windows executable and available to the program as a Qt resource.
+file(GLOB TOOLBAR_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/toolbar/*.svg)
 qt_add_resources(coldhex "app_icons"
     PREFIX "/icons"
     BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
-    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png"
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.png" ${TOOLBAR_ICONS}
 )
 if(WIN32)
     set(COLDHEX_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/coldhex.ico")
@@ -157,7 +158,7 @@ else()
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ColdHex Project")
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1, libqt6svg6")
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
         "${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/linux/postrm")

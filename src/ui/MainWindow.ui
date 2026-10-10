@@ -248,12 +248,15 @@
    </attribute>
    <addaction name="actionConnect"/>
    <addaction name="actionDisconnect"/>
+   <addaction name="separator"/>
    <addaction name="actionRead"/>
    <addaction name="actionErase"/>
    <addaction name="actionProgram"/>
    <addaction name="actionVerify"/>
+   <addaction name="separator"/>
    <addaction name="actionResetTarget"/>
    <addaction name="actionCancel"/>
+   <addaction name="separator"/>
    <addaction name="actionOpenHex"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
