@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.16)
 
 project(probedesk VERSION 0.1.0 LANGUAGES CXX)
 
+if(WIN32)
+    enable_language(RC)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -51,6 +55,19 @@ qt_add_executable(probedesk
     ${SOURCES}
 )
 
+# Application icon: embedded in the Windows executable and available to the program as a Qt resource.
+qt_add_resources(probedesk "app_icons"
+    PREFIX "/icons"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+    FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/probedesk.png"
+)
+if(WIN32)
+    set(PROBEDESK_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/probedesk.ico")
+    configure_file(resources/probedesk.rc.in ${CMAKE_CURRENT_BINARY_DIR}/probedesk.rc @ONLY)
+    target_sources(probedesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/probedesk.rc)
+endif()
+target_compile_definitions(probedesk PRIVATE PROBEDESK_VERSION="${PROJECT_VERSION}")
+
 # Chip descriptions in resources/chips are built into the executable (see resources/chips/README.md).
 file(GLOB CHIP_YAMLS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/chips/*.yaml)
 if(CHIP_YAMLS)
@@ -96,6 +113,8 @@ if(WIN32)
 else()
     install(TARGETS probedesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES packaging/linux/probedesk.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES resources/icons/probedesk.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
+    install(FILES resources/icons/probedesk.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
     install(FILES packaging/linux/69-probedesk.rules DESTINATION lib/udev/rules.d)
     # The program looks for probe-rs in ../lib/probedesk relative to its own folder.
     set(PROBEDESK_PROBE_RS_DEST "lib/probedesk")
@@ -193,6 +212,7 @@ if(PROBEDESK_BUILD_TESTS)
     add_executable(tst_probelist
         tests/tst_proberslist.cpp
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
@@ -206,6 +226,7 @@ if(PROBEDESK_BUILD_TESTS)
         src/core/ChipCatalog.cpp
         src/core/ChipCatalog.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
         src/engine/ProbeRsEngine.h
         src/engine/IProgrammerEngine.h
@@ -239,6 +260,7 @@ if(PROBEDESK_BUILD_TESTS)
         src/engine/UsbScanner.cpp
         src/engine/UsbScanner.h
         src/engine/ProbeRsEngine.cpp
+        src/engine/ChipDescription.cpp
         src/engine/ProbeRsEngine.h
         src/engine/ProbeRsLocator.cpp
         src/engine/IProgrammerEngine.h

@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QIcon>
 #include <QStyleFactory>
 #include <QPalette>
 #include "ui/MainWindow.h"
@@ -7,7 +8,8 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     app.setApplicationName("ProbeDesk");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion(PROBEDESK_VERSION);
+    app.setWindowIcon(QIcon(":/icons/probedesk.png"));
     app.setOrganizationName("ProbeDesk Project");
 
     // Fusion style base

@@ -3,5 +3,6 @@ Type=Application
 Name=ProbeDesk
 Comment=Flash and manage ARM Cortex-M microcontrollers
 Exec=probedesk
+Icon=probedesk
 Terminal=false
 Categories=Development;Electronics;

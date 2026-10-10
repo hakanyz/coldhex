@@ -1,5 +1,6 @@
 #include "ProbeRsEngine.h"
 #include "ProbeRsLocator.h"
+#include "ChipDescription.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
@@ -50,15 +51,14 @@ bool ProbeRsEngine::isBusy() const {
     return m_state != EngineState::Idle;
 }
 
-void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId,
-                                    const QString& chipDescriptionPath) {
-    const bool targetChanged = (chipName != m_currentChip) || (probeId != m_currentProbeId)
-                               || (chipDescriptionPath != m_currentChipDescriptionPath);
+void ProbeRsEngine::configureTarget(const TargetSettings& settings) {
+    const bool targetChanged = settings.chipName != m_target.chipName
+                               || settings.probeId != m_target.probeId
+                               || settings.chipDescriptionPath != m_target.chipDescriptionPath
+                               || settings.protocol != m_target.protocol
+                               || settings.connectUnderReset != m_target.connectUnderReset;
 
-    m_currentChip = chipName;
-    m_currentSpeedKhz = speedKhz;
-    m_currentProbeId = probeId;
-    m_currentChipDescriptionPath = chipDescriptionPath;
+    m_target = settings;
 
     if (targetChanged && m_connected && !isBusy()) {
         m_connected = false;
@@ -68,16 +68,24 @@ void ProbeRsEngine::configureTarget(const QString& chipName, uint32_t speedKhz, 
 
 // Arguments every probe-rs command needs to find the right chip and probe.
 QStringList ProbeRsEngine::targetArgs() const {
+    return targetArgsFor(m_target);
+}
+
+QStringList ProbeRsEngine::targetArgsFor(const TargetSettings& target) {
     // --non-interactive: probe-rs must never wait for a probe choice on a terminal we do not have.
-    QStringList args = {"--chip", m_currentChip, "--non-interactive"};
-    if (!m_currentChipDescriptionPath.isEmpty()) {
-        args << "--chip-description-path" << m_currentChipDescriptionPath;
+    QStringList args = {"--chip", target.chipName, "--non-interactive"};
+    if (!target.chipDescriptionPath.isEmpty()) {
+        args << "--chip-description-path" << target.chipDescriptionPath;
     }
-    if (m_currentSpeedKhz > 0) {
-        args << "--speed" << QString::number(m_currentSpeedKhz);
+    args << "--protocol" << (target.protocol == DebugProtocol::Jtag ? "jtag" : "swd");
+    if (target.speedKhz > 0) {
+        args << "--speed" << QString::number(target.speedKhz);
     }
-    if (!m_currentProbeId.isEmpty()) {
-        args << "--probe" << m_currentProbeId;
+    if (!target.probeId.isEmpty()) {
+        args << "--probe" << target.probeId;
+    }
+    if (target.connectUnderReset) {
+        args << "--connect-under-reset";
     }
     return args;
 }
@@ -91,16 +99,32 @@ QStringList ProbeRsEngine::imageFormatArgs(const QString& filePath, uint32_t bas
     if (suffix.compare("hex", Qt::CaseInsensitive) == 0 || suffix.compare("ihex", Qt::CaseInsensitive) == 0) {
         return {"--binary-format", "hex"};
     }
+    if (suffix.compare("elf", Qt::CaseInsensitive) == 0 || suffix.compare("axf", Qt::CaseInsensitive) == 0) {
+        return {"--binary-format", "elf"};
+    }
     return {};
 }
 
 bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId) {
     if (isBusy()) return false;
 
-    // Keep the chip description chosen by configureTarget(); only chip, speed and probe may change here.
-    configureTarget(chipName, speedKhz, probeId, m_currentChipDescriptionPath);
+    // Protocol, chip description and reset behaviour stay as set by configureTarget().
+    TargetSettings settings = m_target;
+    settings.chipName = chipName;
+    settings.speedKhz = speedKhz;
+    settings.probeId = probeId;
+    configureTarget(settings);
 
-    QStringList args = QStringList{"info"} + targetArgs();
+    // "probe-rs info" ignores --chip, so it would not notice a wrongly selected chip. Reading one
+    // word of RAM attaches with the selected chip and also works when flash read-out is locked.
+    QStringList args;
+    const ChipMemoryMap memory = queryMemoryMap(chipName, m_target.chipDescriptionPath);
+    if (const MemoryRegion* ram = memory.firstRam()) {
+        args = QStringList{"read"} + targetArgs()
+               + QStringList{"b32", QString("0x%1").arg(ram->start, 8, 16, QLatin1Char('0')), "1"};
+    } else {
+        args = QStringList{"info"} + targetArgs();
+    }
     runCommand(args, EngineState::Connecting, QString("Connecting to target: %1 (%2 kHz)").arg(chipName).arg(speedKhz));
     return true;
 }
@@ -303,7 +327,7 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
 
     if (completedState == EngineState::Connecting) {
         m_connected = success;
-        emit connected(success, success ? m_currentChip : "Connection failed.");
+        emit connected(success, success ? m_target.chipName : "Connection failed.");
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)
@@ -343,4 +367,57 @@ void ProbeRsEngine::onChipListErrorOccurred(QProcess::ProcessError error) {
         emit chipListReady(false, {},
                            QString("Cannot run '%1'. Install probe-rs and make sure it is in PATH.").arg(m_executablePath));
     }
+}
+
+ChipMemoryMap ProbeRsEngine::parseChipInfo(const QString& output) {
+    // Lines look like "NVM: 0x08000000..0x08100000 (1.0 MiB)" or "RAM: ...".
+    static const QRegularExpression regionRegex(R"(^\s*(NVM|RAM):\s*(0x[0-9A-Fa-f]+)\.\.(0x[0-9A-Fa-f]+))");
+
+    ChipMemoryMap map;
+    const QStringList lines = output.split('\n');
+    for (const QString& line : lines) {
+        const QRegularExpressionMatch m = regionRegex.match(line);
+        if (!m.hasMatch()) continue;
+
+        MemoryRegion r;
+        r.nonVolatile = (m.captured(1) == "NVM");
+        r.start = m.captured(2).toULongLong(nullptr, 16);
+        const uint64_t end = m.captured(3).toULongLong(nullptr, 16);
+        r.size = end > r.start ? end - r.start : 0;
+        if (r.size > 0) map.regions.append(r);
+    }
+    return map;
+}
+
+ChipMemoryMap ProbeRsEngine::queryMemoryMap(const QString& chipName, const QString& chipDescriptionPath) {
+    if (chipName.isEmpty()) return {};
+
+    if (!chipDescriptionPath.isEmpty()) {
+        return ChipDescription::memoryMapFromFile(chipDescriptionPath, chipName);
+    }
+
+    QProcess proc;
+    proc.start(m_executablePath, {"chip", "info", chipName});
+    if (!proc.waitForFinished(5000)) {
+        proc.kill();
+        return {};
+    }
+    if (proc.exitCode() != 0) return {};
+    return parseChipInfo(QString::fromUtf8(proc.readAllStandardOutput()));
+}
+
+void ProbeRsEngine::readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) {
+    if (isBusy() || byteCount == 0) return;
+
+    // 32-bit words are much faster than bytes; fall back to bytes for odd sizes or addresses.
+    const bool wordAligned = (address % 4 == 0) && (byteCount % 4 == 0);
+    const QString width = wordAligned ? "b32" : "b8";
+    const uint64_t count = wordAligned ? byteCount / 4 : byteCount;
+
+    QStringList args = QStringList{"read"} + targetArgs();
+    args << "--output" << outputFile << "--format" << "binary"
+         << width << QString("0x%1").arg(address, 8, 16, QLatin1Char('0')) << QString::number(count);
+
+    runCommand(args, EngineState::Reading,
+               QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0')));
 }

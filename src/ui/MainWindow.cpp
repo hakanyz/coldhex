@@ -9,8 +9,14 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
+#include <QApplication>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QCompleter>
 #include <QLineEdit>
 #include <QStringListModel>
@@ -29,6 +35,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+    setAcceptDrops(true);
 
     setupUiCustomizations();
     setupToolBarWidgets();
@@ -39,6 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
     connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
     connect(m_engine, &ProbeRsEngine::chipListReady, this, &MainWindow::onChipListReady);
+    connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);
@@ -50,6 +58,9 @@ MainWindow::MainWindow(QWidget *parent)
     // Toolbar Actions
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::onConnectTriggered);
     connect(ui->actionDisconnect, &QAction::triggered, this, &MainWindow::onDisconnectTriggered);
+    connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
+    connect(ui->actionSaveLog, &QAction::triggered, this, &MainWindow::onSaveLogTriggered);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
@@ -60,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRefreshProbes, &QAction::triggered, this, &MainWindow::onRefreshProbesTriggered);
     connect(ui->actionAddChipFile, &QAction::triggered, this, &MainWindow::onAddChipFileTriggered);
     connect(ui->actionSystemCheck, &QAction::triggered, this, &MainWindow::onSystemCheckTriggered);
+    connect(ui->actionCancel, &QAction::triggered, this, &MainWindow::onCancelTriggered);
     connect(ui->actionClearChipFiles, &QAction::triggered, this, &MainWindow::onClearChipFilesTriggered);
 
     // Settings Panel Controls
@@ -80,7 +92,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Model selection updates memory map title
     connect(ui->comboModel, &QComboBox::currentTextChanged, [this](const QString& model) {
-        ui->lblMemoryMapTitle->setText(QString("Memory Map (%1) - Flash").arg(model.trimmed()));
+        const QString name = model.trimmed();
+        ui->lblMemoryMapTitle->setText(name.isEmpty() ? QString("Memory Map") : QString("Memory Map (%1) - Flash").arg(name));
     });
 
     onRefreshProbesTriggered();
@@ -130,6 +143,10 @@ void MainWindow::restoreSettings() {
 
     ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
     ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
+    ui->checkEraseBeforeFlash->setChecked(s.eraseBeforeFlash);
+    ui->checkVerifyAfterFlash->setChecked(s.verifyAfterFlash);
+    ui->checkResetAfterFlash->setChecked(s.resetAfterFlash);
+    ui->checkConnectUnderReset->setChecked(s.connectUnderReset);
     ui->editSlot1Path->setText(s.slot1Path);
     if (!s.slot1Address.isEmpty()) ui->editSlot1Address->setText(s.slot1Address);
     if (!s.slot2Address.isEmpty()) ui->editSlot2Address->setText(s.slot2Address);
@@ -153,6 +170,10 @@ void MainWindow::saveSettings() {
     s.customChipFiles = m_customChipFiles;
     s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
     s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
+    s.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
+    s.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
+    s.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
+    s.connectUnderReset = ui->checkConnectUnderReset->isChecked();
     s.geometry = saveGeometry();
     s.windowState = saveState();
 
@@ -180,10 +201,8 @@ void MainWindow::setupUiCustomizations() {
     ui->dockTargetSettings->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     ui->dockConsoleOutput->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-    // Not implemented yet: keep it disabled instead of faking a result.
-    ui->actionRead->setEnabled(false);
-    ui->actionRead->setToolTip("Read target memory - not implemented yet");
     ui->actionVerify->setToolTip("Compare the target with the selected firmware files");
+    ui->actionRead->setToolTip("Read the chip's flash into a file and show it in the memory view");
 
     ui->statusBar->showMessage("Ready");
 }
@@ -351,7 +370,14 @@ bool MainWindow::prepareEngine() {
 
     const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
     const QString descriptionFile = entry ? entry->descriptionFile : QString();
-    m_engine->configureTarget(chip, ui->spinSpeed->value(), ui->comboProbe->currentData().toString(), descriptionFile);
+    TargetSettings target;
+    target.chipName = chip;
+    target.speedKhz = ui->spinSpeed->value();
+    target.probeId = ui->comboProbe->currentData().toString();
+    target.chipDescriptionPath = descriptionFile;
+    target.protocol = (ui->comboInterface->currentText() == "JTAG") ? DebugProtocol::Jtag : DebugProtocol::Swd;
+    target.connectUnderReset = ui->checkConnectUnderReset->isChecked();
+    m_engine->configureTarget(target);
     return true;
 }
 
@@ -389,10 +415,12 @@ void MainWindow::updateUiState() {
     bool busy = m_isOperationRunning || m_engine->isBusy();
     ui->actionConnect->setEnabled(!busy && !m_engine->isConnected());
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
+    ui->actionRead->setEnabled(!busy);
     ui->actionErase->setEnabled(!busy);
     ui->actionProgram->setEnabled(!busy);
     ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
+    ui->actionCancel->setEnabled(busy);
 }
 
 void MainWindow::onRefreshProbesTriggered() {
@@ -458,10 +486,11 @@ void MainWindow::onEraseTriggered() {
 bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2) {
     if (!resolveChip(cfg.chipName)) return false;
     cfg.speedKhz = ui->spinSpeed->value();
+    cfg.probeId = ui->comboProbe->currentData().toString();
     cfg.autoSpeedEnabled = true;
-    cfg.eraseBeforeFlash = true;
-    cfg.verifyAfterFlash = true;
-    cfg.resetAfterFlash = true;
+    cfg.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
+    cfg.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
+    cfg.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
 
     AddressRange range1;
     AddressRange range2;
@@ -481,7 +510,36 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
         return false;
     }
 
-    return prepareEngine();
+    if (!prepareEngine()) return false;
+
+    // Refuse to write outside the chip's flash. Skipped when the memory layout is unknown.
+    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, cfg.chipName);
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(cfg.chipName, entry ? entry->descriptionFile : QString());
+    if (memory.isValid()) {
+        struct SlotCheck { const FirmwareSlot* slot; const AddressRange* range; };
+        for (const SlotCheck& c : {SlotCheck{&s1, &range1}, SlotCheck{&s2, &range2}}) {
+            if (!c.slot->enabled || memory.flashContains(c.range->start, c.range->size)) continue;
+
+            const MemoryRegion* flash = memory.mainFlash();
+            QString msg = QString("%1 (0x%2 - 0x%3) does not fit into the flash of %4")
+                              .arg(c.slot->label)
+                              .arg(c.range->start, 8, 16, QLatin1Char('0'))
+                              .arg(uint64_t(c.range->start) + c.range->size - 1, 8, 16, QLatin1Char('0'))
+                              .arg(cfg.chipName);
+            if (flash) {
+                msg += QString(" (0x%1 - 0x%2).")
+                           .arg(flash->start, 8, 16, QLatin1Char('0'))
+                           .arg(flash->end() - 1, 8, 16, QLatin1Char('0'));
+            } else {
+                msg += ".";
+            }
+            msg += "\nCheck the start address of the slot and the selected chip.";
+            appendLog("ERROR", msg, "#ff5555");
+            QMessageBox::warning(this, "Outside Flash Range", msg);
+            return false;
+        }
+    }
+    return true;
 }
 
 void MainWindow::onProgramTriggered() {
@@ -536,9 +594,13 @@ bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& rang
     }
 
     HexParseResult res;
-    if (HexParser::detectFormat(path) == FileFormat::IntelHex) {
+    const FileFormat format = HexParser::detectFormat(path);
+    if (format == FileFormat::IntelHex) {
         res = HexParser::analyzeHexFile(path, false);
         address = res.baseAddress;  // HEX records carry their own addresses
+    } else if (format == FileFormat::Elf) {
+        res = HexParser::analyzeElfFile(path, false);
+        address = res.baseAddress;  // so do the segments of an ELF file
     } else {
         res = HexParser::analyzeBinFile(path, address);
     }
@@ -569,14 +631,14 @@ void MainWindow::onOpenHexTriggered() {
 }
 
 void MainWindow::onOpenSlot1Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 1 (Bootloader) File", "", "Firmware Files (*.hex *.bin);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select Slot 1 (Bootloader) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot1Path->setText(file);
     }
 }
 
 void MainWindow::onOpenSlot2Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 2 (Application) File", "", "Firmware Files (*.hex *.bin);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select Slot 2 (Application) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot2Path->setText(file);
     }
@@ -600,6 +662,8 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
     HexParseResult res;
     if (fmt == FileFormat::IntelHex) {
         res = HexParser::analyzeHexFile(path, true);
+    } else if (fmt == FileFormat::Elf) {
+        res = HexParser::analyzeElfFile(path, true);
     } else {
         uint32_t base = 0x08000000;
         slotAddress(slotIndex, base);
@@ -688,8 +752,8 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
-        ui->statusBar->showMessage(QString("Connected to %1 via SWD at %2 kHz").arg(chipInfo).arg(ui->spinSpeed->value()));
-        appendLog("INFO", QString("Connected to %1 via SWD at %2 kHz.").arg(chipInfo).arg(ui->spinSpeed->value()), "#2ecc71");
+        ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
+        appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()), "#2ecc71");
     } else {
         ui->statusBar->showMessage("Connection Failed");
         appendLog("ERROR", QString("Connection failed: %1").arg(chipInfo), "#e74c3c");
@@ -704,6 +768,7 @@ void MainWindow::onEngineDisconnected() {
 }
 
 void MainWindow::onSequenceStarted() {
+    m_sequenceRunning = true;
     m_isOperationRunning = true;
     ui->progressBar->setValue(0);
     updateUiState();
@@ -711,6 +776,7 @@ void MainWindow::onSequenceStarted() {
 }
 
 void MainWindow::onSequenceFinished(bool success, const QString& message) {
+    m_sequenceRunning = false;
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
@@ -763,4 +829,144 @@ void MainWindow::onChipTextCommitted() {
         if (idx >= 0) ui->comboManufacturer->setCurrentIndex(idx);  // keeps the chip name
         ui->comboModel->setEditText(canonical);
     });
+}
+
+void MainWindow::onCancelTriggered() {
+    appendLog("WARNING", "Stopping the running operation...", "#e67e22");
+    if (m_sequenceRunning) {
+        m_coordinator->cancelSequence();
+    } else {
+        m_engine->cancelCurrentOperation();
+    }
+}
+
+// Single commands (Erase, Reset, ...) end here; during a sequence the coordinator decides
+// what happens next and the window is updated from its own signals.
+void MainWindow::onEngineOperationFinished(bool success, const QString& message) {
+    Q_UNUSED(message);
+
+    // A memory read just ended: show what was read.
+    if (!m_pendingReadFile.isEmpty()) {
+        const QString file = m_pendingReadFile;
+        m_pendingReadFile.clear();
+        m_isOperationRunning = false;
+        updateUiState();
+
+        QFile in(file);
+        if (success && in.open(QIODevice::ReadOnly)) {
+            m_targetReadData = in.readAll();
+            m_targetReadBaseAddress = m_pendingReadBase;
+            ui->radioSourceTarget->setChecked(true);
+            updateMemoryViewer();
+            appendLog("SUCCESS", QString("Read %1 bytes into %2").arg(m_targetReadData.size()).arg(file), "#2ecc71");
+        } else if (success) {
+            appendLog("ERROR", "The read finished, but the output file could not be opened: " + file, "#e74c3c");
+        }
+        return;
+    }
+
+    if (m_sequenceRunning) return;
+    m_isOperationRunning = false;
+    updateUiState();
+}
+
+void MainWindow::onReadTargetTriggered() {
+    if (!prepareEngine()) return;
+
+    const QString chip = ui->comboModel->currentText().trimmed();
+    const ChipEntry* entry = ChipCatalog::findEntry(m_chips, chip);
+    const ChipMemoryMap memory = m_engine->queryMemoryMap(chip, entry ? entry->descriptionFile : QString());
+    const MemoryRegion* flash = memory.mainFlash();
+    if (!flash) {
+        const QString msg = "The flash size of this chip is unknown, so the whole flash cannot be read.";
+        appendLog("ERROR", msg, "#ff5555");
+        QMessageBox::warning(this, "Read Flash", msg);
+        return;
+    }
+
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                  .filePath(chip + "_flash.bin");
+    const QString file = QFileDialog::getSaveFileName(this, "Save Flash Contents As", suggested,
+                                                      "Binary (*.bin);;All Files (*.*)");
+    if (file.isEmpty()) return;
+
+    m_pendingReadFile = file;
+    m_pendingReadBase = static_cast<uint32_t>(flash->start);
+    m_isOperationRunning = true;
+    updateUiState();
+    appendLog("INFO", QString("Reading %1 KiB of flash from 0x%2...")
+                          .arg(flash->size / 1024).arg(flash->start, 8, 16, QLatin1Char('0')));
+    m_engine->readMemory(flash->start, flash->size, file);
+}
+
+void MainWindow::onSaveLogTriggered() {
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                  .filePath("probedesk-log.txt");
+    const QString file = QFileDialog::getSaveFileName(this, "Save Log", suggested, "Text (*.txt);;All Files (*.*)");
+    if (file.isEmpty()) return;
+
+    QFile out(file);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Save Log", "Cannot write to " + file);
+        return;
+    }
+    out.write(ui->textLog->toPlainText().toUtf8());
+    appendLog("INFO", "Log saved to " + file);
+}
+
+namespace {
+
+bool isFirmwareFile(const QString& path) {
+    const FileFormat format = HexParser::detectFormat(path);
+    return format == FileFormat::IntelHex || format == FileFormat::RawBinary || format == FileFormat::Elf;
+}
+
+// Names that usually belong to a bootloader: boot.hex, my_bootloader.bin, app_bl.elf ...
+bool looksLikeBootloader(const QString& path) {
+    const QString name = QFileInfo(path).completeBaseName().toLower();
+    return name.contains("boot") || name.endsWith("_bl") || name.startsWith("bl_") || name == "bl";
+}
+
+}  // namespace
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
+    if (!event->mimeData()->hasUrls()) return;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+}
+
+// Dropped firmware files go to the slots: bootloader-like names to Slot 1, everything else to
+// Slot 2. Two files without such a name fill Slot 1 and Slot 2 in the order they were dropped.
+void MainWindow::dropEvent(QDropEvent* event) {
+    QStringList files;
+    for (const QUrl& url : event->mimeData()->urls()) {
+        if (url.isLocalFile() && isFirmwareFile(url.toLocalFile())) files << url.toLocalFile();
+    }
+    if (files.isEmpty()) return;
+
+    const bool twoPlainFiles = files.size() == 2 && !looksLikeBootloader(files[0]) && !looksLikeBootloader(files[1]);
+    for (int i = 0; i < files.size() && i < 2; ++i) {
+        const QString& file = files[i];
+        const bool toSlot1 = twoPlainFiles ? (i == 0) : looksLikeBootloader(file);
+        QLineEdit* edit = toSlot1 ? ui->editSlot1Path : ui->editSlot2Path;
+        QCheckBox* check = toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled;
+        edit->setText(file);
+        check->setChecked(true);
+        appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(file).fileName(), toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
+    }
+    if (files.size() > 2) appendLog("WARNING", "Only the first two dropped files were used.");
+    event->acceptProposedAction();
+}
+
+void MainWindow::onAboutTriggered() {
+    QMessageBox::about(this, "About ProbeDesk",
+        QString("<h3>ProbeDesk %1</h3>"
+                "<p>Flash and manage ARM Cortex-M microcontrollers through ST-Link, J-Link and CMSIS-DAP probes. "
+                "Flashing is done by <a href='https://probe.rs'>probe-rs</a>.</p>"
+                "<p>Licensed under the GNU LGPL v3. Built with Qt %2.</p>")
+            .arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
 }

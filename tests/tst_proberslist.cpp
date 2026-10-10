@@ -38,6 +38,58 @@ private slots:
         QVERIFY(ProbeRsEngine::parseProbeList("No debug probes were found.\n").isEmpty());
         QVERIFY(ProbeRsEngine::parseProbeList("The following debug probes were found:\n").isEmpty());
     }
+
+    void buildsTargetArguments() {
+        TargetSettings t;
+        t.chipName = "STM32F407VG";
+        t.speedKhz = 2000;
+        t.probeId = "0483:3748";
+        const QStringList args = ProbeRsEngine::targetArgsFor(t);
+
+        QCOMPARE(args, (QStringList{"--chip", "STM32F407VG", "--non-interactive", "--protocol", "swd",
+                                    "--speed", "2000", "--probe", "0483:3748"}));
+    }
+
+    void targetArgumentsReflectProtocolResetAndDescription() {
+        TargetSettings t;
+        t.chipName = "APM32F103CB";
+        t.speedKhz = 0;
+        t.protocol = DebugProtocol::Jtag;
+        t.connectUnderReset = true;
+        t.chipDescriptionPath = "C:/chips/apm32.yaml";
+        const QStringList args = ProbeRsEngine::targetArgsFor(t);
+
+        QVERIFY(args.contains("jtag"));
+        QVERIFY(!args.contains("swd"));
+        QVERIFY(args.contains("--connect-under-reset"));
+        QVERIFY(!args.contains("--speed"));
+        QVERIFY(!args.contains("--probe"));
+        const int i = args.indexOf("--chip-description-path");
+        QVERIFY(i >= 0);
+        QCOMPARE(args.at(i + 1), QString("C:/chips/apm32.yaml"));
+    }
+
+    void parsesChipInfoMemoryRegions() {
+        const QString out =
+            "STM32F407VG\n"
+            "Cores (1):\n"
+            "    - main (Armv7em)\n"
+            "NVM: 0x08000000..0x08100000 (1.0 MiB)\n"
+            "RAM: 0x10000000..0x10010000 (64.0 KiB)\n"
+            "NVM: 0x1fff7800..0x1fff7a10 (528 B)\n"
+            "RAM: 0x20000000..0x2001c000 (112.0 KiB)\n";
+        const ChipMemoryMap map = ProbeRsEngine::parseChipInfo(out);
+
+        QCOMPARE(map.regions.size(), 4);
+        QVERIFY(map.mainFlash());
+        QCOMPARE(map.mainFlash()->start, uint64_t(0x08000000));
+        QCOMPARE(map.mainFlash()->size, uint64_t(0x100000));
+        QCOMPARE(map.firstRam()->start, uint64_t(0x10000000));
+        QVERIFY(map.flashContains(0x08008000, 0x4000));
+        QVERIFY(!map.flashContains(0x080FFF00, 0x200));   // runs past the end of the flash
+        QVERIFY(!map.flashContains(0x20000000, 16));      // RAM is not flash
+        QVERIFY(ProbeRsEngine::parseChipInfo("Error: unknown chip\n").regions.isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestProbeList)

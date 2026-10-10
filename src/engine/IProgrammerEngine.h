@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QList>
 #include <cstdint>
+#include "ChipMemory.h"
 
 enum class EngineLogLevel {
     Debug,
@@ -35,6 +36,18 @@ struct ProbeInfo {
     }
 };
 
+enum class DebugProtocol { Swd, Jtag };
+
+// Everything a probe-rs command needs to know about the target and the way to reach it.
+struct TargetSettings {
+    QString chipName;
+    uint32_t speedKhz = 4000;
+    QString probeId;               // VID:PID[:serial], empty = let probe-rs pick
+    QString chipDescriptionPath;   // YAML for chips probe-rs does not know
+    DebugProtocol protocol = DebugProtocol::Swd;
+    bool connectUnderReset = false;
+};
+
 class IProgrammerEngine : public QObject {
     Q_OBJECT
 
@@ -44,8 +57,9 @@ public:
 
     // Sets chip, speed and probe used by the following commands. Switching chip or
     // probe drops an existing connection.
-    virtual void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString(),
-                                 const QString& chipDescriptionPath = QString()) = 0;
+    virtual void configureTarget(const TargetSettings& settings) = 0;
+    // Memory layout of the configured chip (empty map when unknown). May run a short command.
+    virtual ChipMemoryMap queryMemoryMap(const QString& chipName, const QString& chipDescriptionPath) = 0;
     virtual bool connectTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId = QString()) = 0;
     virtual void disconnectTarget() = 0;
     virtual bool isConnected() const = 0;
@@ -54,6 +68,8 @@ public:
     virtual void eraseTarget(bool fullErase = true) = 0;
     virtual void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) = 0;
     virtual void verifyFile(const QString& filePath, uint32_t baseAddress) = 0;
+    // Saves `byteCount` bytes starting at `address` to `outputFile` as raw binary.
+    virtual void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) = 0;
     virtual void resetTarget(bool halt = false) = 0;
     virtual void cancelCurrentOperation() = 0;
 

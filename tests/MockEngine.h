@@ -11,8 +11,9 @@ class MockEngine : public IProgrammerEngine {
 public:
     explicit MockEngine(QObject* parent = nullptr) : IProgrammerEngine(parent) {}
 
-    void configureTarget(const QString& chipName, uint32_t speedKhz, const QString& probeId, const QString& descriptionPath) override {
-        configured << QString("%1@%2:%3:%4").arg(chipName).arg(speedKhz).arg(probeId, descriptionPath);
+    void configureTarget(const TargetSettings& s) override {
+        configured << QString("%1@%2:%3:%4:%5:%6").arg(s.chipName).arg(s.speedKhz).arg(s.probeId, s.chipDescriptionPath)
+                          .arg(s.protocol == DebugProtocol::Jtag ? "jtag" : "swd").arg(s.connectUnderReset ? "cur" : "-");
     }
     void verifyFile(const QString& filePath, uint32_t baseAddress) override {
         commands << QString("verify:%1@0x%2").arg(filePath).arg(baseAddress, 0, 16);
@@ -34,9 +35,14 @@ public:
         commands << QString("program:%1@0x%2%3").arg(filePath).arg(baseAddress, 0, 16).arg(verify ? ":verify" : "");
         m_busy = true;
     }
+    void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) override {
+        commands << QString("read:0x%1+%2:%3").arg(address, 0, 16).arg(byteCount).arg(outputFile);
+        m_busy = true;
+    }
     void resetTarget(bool) override { commands << "reset"; m_busy = true; }
     void cancelCurrentOperation() override { commands << "cancel"; m_busy = false; }
 
+    ChipMemoryMap queryMemoryMap(const QString&, const QString&) override { return memory; }
     void requestChipList() override { emit chipListReady(true, chips, QString()); }
     QList<ProbeInfo> listAvailableProbes() override { return {}; }
 
@@ -53,6 +59,7 @@ public:
     QStringList commands;
     QStringList configured;
     QList<ChipEntry> chips;
+    ChipMemoryMap memory;
 
 private:
     bool m_connected = false;

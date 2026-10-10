@@ -98,6 +98,89 @@ private slots:
         QVERIFY(ChipDescription::variantNamesFromFile(f.fileName(), nullptr, &error).isEmpty());
         QVERIFY(error.contains("does not look like"));
     }
+
+    void readsMemoryMapOfOneVariant() {
+        const QString yaml =
+            "name: Test Series\n"
+            "variants:\n"
+            "- name: CHIP_A\n"
+            "  cores:\n"
+            "  - name: main\n"
+            "    type: armv7m\n"
+            "  memory_map:\n"
+            "  - !Nvm\n"
+            "    name: IROM1\n"
+            "    range:\n"
+            "      start: 0x8000000\n"
+            "      end: 0x8010000\n"
+            "    cores:\n"
+            "    - main\n"
+            "  - !Ram\n"
+            "    name: IRAM1\n"
+            "    range:\n"
+            "      start: 0x20000000\n"
+            "      end: 0x20002000\n"
+            "  flash_algorithms:\n"
+            "  - algo\n"
+            "- name: CHIP_B\n"
+            "  memory_map:\n"
+            "  - !Nvm\n"
+            "    name: IROM1\n"
+            "    range:\n"
+            "      start: 0x8000000\n"
+            "      end: 0x8040000\n"
+            "flash_algorithms:\n"
+            "- name: algo\n";
+
+        const ChipMemoryMap a = ChipDescription::memoryMap(yaml, "chip_a");
+        QCOMPARE(a.regions.size(), 2);
+        QCOMPARE(a.mainFlash()->size, uint64_t(0x10000));
+        QCOMPARE(a.firstRam()->start, uint64_t(0x20000000));
+        QCOMPARE(a.firstRam()->size, uint64_t(0x2000));
+
+        const ChipMemoryMap b = ChipDescription::memoryMap(yaml, "CHIP_B");
+        QCOMPARE(b.mainFlash()->size, uint64_t(0x40000));
+        QVERIFY(!b.firstRam());
+
+        QVERIFY(!ChipDescription::memoryMap(yaml, "CHIP_C").isValid());
+    }
+
+    void readsMemoryMapFromRealGeneratedFile() {
+        // A GD32E23x-style entry, exactly as target-gen writes it.
+        const QString yaml =
+            "name: GD32E23x Series\n"
+            "variants:\n"
+            "- name: GD32E230C4\n"
+            "  cores:\n"
+            "  - name: main\n"
+            "    type: armv8m\n"
+            "    core_access_options: !Arm\n"
+            "      ap: !v1 0\n"
+            "  memory_map:\n"
+            "  - !Nvm\n"
+            "    name: IROM1\n"
+            "    range:\n"
+            "      start: 0x8000000\n"
+            "      end: 0x8004000\n"
+            "    cores:\n"
+            "    - main\n"
+            "    access:\n"
+            "      write: false\n"
+            "      boot: true\n"
+            "  - !Ram\n"
+            "    name: IRAM1\n"
+            "    range:\n"
+            "      start: 0x20000000\n"
+            "      end: 0x20001000\n"
+            "    cores:\n"
+            "    - main\n"
+            "  flash_algorithms:\n"
+            "  - gd32e23x\n";
+        const ChipMemoryMap m = ChipDescription::memoryMap(yaml, "GD32E230C4");
+        QCOMPARE(m.mainFlash()->start, uint64_t(0x8000000));
+        QCOMPARE(m.mainFlash()->size, uint64_t(0x4000));
+        QCOMPARE(m.firstRam()->size, uint64_t(0x1000));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestChipDescription)
