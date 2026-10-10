@@ -61,4 +61,4 @@ src/
 ```
 
 ## License
-MIT
+ProbeDesk is licensed under the GNU Lesser General Public License v3.0 (see `LICENSE`, and `COPYING` for the GPL text it refers to). Third-party components are listed in `packaging/THIRD_PARTY_NOTICES.md`.
