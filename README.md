@@ -9,6 +9,11 @@ ProbeDesk is a modern, modular desktop flashing and management utility for ARM C
 - **probe-rs Engine:** Robust, open-source, Rust-based asynchronous flashing back-end
 - **Dual-Slot Flashing:** Coordinated sequential programming & verification for Bootloader and Application binaries
 - **Auto-Speed Fallback:** Dynamic frequency reduction when communication or verification errors occur
+- **Safe Programming:** Start addresses per slot, overlap and flash-range checks, Intel HEX checksum validation, optional chip erase / verify / reset, connect under reset, SWD or JTAG
+- **File Formats:** Intel HEX, raw binary with start address, and ELF; drag and drop onto the window
+- **Read & Verify:** Read the chip's flash into a file and compare the target with your firmware files
+- **Chip Search:** Search all chips probe-rs knows while typing; add vendor chips probe-rs lacks (e.g. APM32 is bundled) from CMSIS-Packs
+- **System Check:** Detects missing probe-rs, probes and drivers and explains what to do
 - **Layered Architecture:** Clear decoupling between Presentation (Qt Widgets), Core logic, and Engine drivers
 
 ## Requirements
