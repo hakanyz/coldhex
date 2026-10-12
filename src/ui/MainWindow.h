@@ -13,6 +13,7 @@
 #include "engine/ProbeRsEngine.h"
 #include "HexMemoryModel.h"
 #include "ConsoleDock.h"
+#include "OperationStatus.h"
 #include "ChipSelector.h"
 #include "ProbeSelector.h"
 
@@ -64,7 +65,6 @@ private slots:
     void onSequenceStarted();
     void onSequenceFinished(bool success, const QString& message);
     void onStepChanged(const QString& stepDescription, int stepIndex, int totalSteps);
-    void onTotalProgressChanged(int overallPercentage);
     void onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz);
 
 private:
@@ -87,6 +87,7 @@ private:
     FlashCoordinator *m_coordinator;
     HexMemoryModel *m_memoryModel;
     ConsoleDock* m_console = nullptr;
+    OperationStatus* m_operationStatus = nullptr;
     bool m_lastCommandWasErase = false;
     ChipSelector* m_chipSelector = nullptr;
     ProbeSelector* m_probeSelector = nullptr;

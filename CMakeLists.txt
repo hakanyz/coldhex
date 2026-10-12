@@ -48,6 +48,8 @@ set(SOURCES
     src/ui/SystemCheckDialog.h
     src/ui/ConsoleDock.h
     src/ui/ConsoleDock.cpp
+    src/ui/OperationStatus.h
+    src/ui/OperationStatus.cpp
     src/ui/ChipSelector.h
     src/ui/ChipSelector.cpp
     src/ui/ProbeSelector.h
@@ -322,4 +324,17 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_theme PRIVATE src)
     target_link_libraries(tst_theme PRIVATE Qt6::Widgets Qt6::Test)
     add_test(NAME tst_theme COMMAND tst_theme)
+
+    add_executable(tst_operationstatus
+        tests/tst_operationstatus.cpp
+        tests/MockEngine.h
+        src/ui/OperationStatus.cpp
+        src/ui/OperationStatus.h
+        src/core/FlashCoordinator.cpp
+        src/core/FlashCoordinator.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_operationstatus PRIVATE src tests)
+    target_link_libraries(tst_operationstatus PRIVATE Qt6::Widgets Qt6::Test)
+    add_test(NAME tst_operationstatus COMMAND tst_operationstatus)
 endif()
