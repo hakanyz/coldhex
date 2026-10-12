@@ -34,6 +34,8 @@ public:
 signals:
     void message(const QString& level, const QString& text);
     void status(const QString& text, int timeoutMs);
+    // Every successful look at the probes, with the VID:PID[:serial] of each one found.
+    void probesListed(const QStringList& selectors);
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

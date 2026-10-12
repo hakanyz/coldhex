@@ -97,6 +97,19 @@ private slots:
         QVERIFY(ProbeRsEngine::helperFormat("app.txt").isEmpty());  // probe-rs decides for these
     }
 
+    void aConnectionNoticesWhenItsProbeIsGone() {
+        const QStringList both{"0483:3748", "1366:0101:004294967295"};
+        QVERIFY(ProbeRsEngine::probeStillListed("0483:3748", both));
+        QVERIFY(ProbeRsEngine::probeStillListed("1366:0101:004294967295", both));
+        QVERIFY(!ProbeRsEngine::probeStillListed("0483:3748", {"1366:0101:004294967295"}));
+        QVERIFY(!ProbeRsEngine::probeStillListed("0483:3748", {}));
+    }
+
+    void aConnectionWithoutAChosenProbeNeedsAnyProbe() {
+        QVERIFY(ProbeRsEngine::probeStillListed("", {"0483:3748"}));
+        QVERIFY(!ProbeRsEngine::probeStillListed("", {}));
+    }
+
     void helperFormatArgumentsAddTheBaseAddressOnlyForBinFiles() {
         QCOMPARE(ProbeRsEngine::helperFormatArgs("app.hex", 0x08008000), (QStringList{"--format", "hex"}));
         QCOMPARE(ProbeRsEngine::helperFormatArgs("app.bin", 0x08008000),

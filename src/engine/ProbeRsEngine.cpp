@@ -104,6 +104,11 @@ QStringList ProbeRsEngine::targetArgsFor(const TargetSettings& target) {
     return args;
 }
 
+bool ProbeRsEngine::probeStillListed(const QString& connectedSelector, const QStringList& listedSelectors) {
+    if (connectedSelector.isEmpty()) return !listedSelectors.isEmpty();
+    return listedSelectors.contains(connectedSelector);
+}
+
 QStringList ProbeRsEngine::helperTargetArgsFor(const TargetSettings& target) {
     QStringList args = {"--chip", target.chipName};
     if (!target.chipDescriptionPath.isEmpty()) {

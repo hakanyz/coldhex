@@ -62,6 +62,7 @@ private slots:
     void onEngineLogMessage(const QString& message, EngineLogLevel level);
     void onEngineConnected(bool success, const QString& chipInfo);
     void onEngineDisconnected();
+    void onProbesListed(const QStringList& selectors);
     void onSequenceStarted();
     void onSequenceFinished(bool success, const QString& message);
     void onStepChanged(const QString& stepDescription, int stepIndex, int totalSteps);
@@ -105,6 +106,7 @@ private:
     bool m_isOperationRunning = false;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
     bool m_manualConnect = false;  // the user pressed Connect (not a step of a sequence)
+    QString m_connectedProbe;      // VID:PID[:serial] of the probe the connection was made with
     QString m_pendingReadFile;       // set while a memory read is running
     uint32_t m_pendingReadBase = 0;
 };

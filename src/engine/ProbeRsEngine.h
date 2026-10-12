@@ -42,6 +42,10 @@ public:
     // The arguments that select chip, probe, protocol and speed for every probe-rs command.
     static QStringList targetArgsFor(const TargetSettings& target);
 
+    // True while the probe a connection was made with is still in the list of probes. An empty
+    // `connectedSelector` means "whichever probe probe-rs picked", so any probe will do.
+    static bool probeStillListed(const QString& connectedSelector, const QStringList& listedSelectors);
+
     // Parses the output of "probe-rs list".
     static QList<ProbeInfo> parseProbeList(const QString& output);
 

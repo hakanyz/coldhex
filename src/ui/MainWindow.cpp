@@ -61,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_probeSelector = new ProbeSelector(this, ui->comboProbe, m_engine, [this]() { return m_isOperationRunning || m_engine->isBusy(); });
     connect(m_probeSelector, &ProbeSelector::message, this, &MainWindow::appendLog);
     connect(m_probeSelector, &ProbeSelector::status, ui->statusBar, &QStatusBar::showMessage);
+    connect(m_probeSelector, &ProbeSelector::probesListed, this, &MainWindow::onProbesListed);
     setAcceptDrops(true);
 
     setupUiCustomizations();
@@ -591,6 +592,7 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
+        m_connectedProbe = m_probeSelector->selector();
         ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
         appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
     } else {
@@ -607,6 +609,16 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
         }
     }
     m_manualConnect = false;
+}
+
+// The probe was unplugged while the program shows "connected": nothing else would tell it, so
+// the connection is closed here. Not during an operation: that one fails by itself.
+void MainWindow::onProbesListed(const QStringList& selectors) {
+    if (!m_engine->isConnected() || m_isOperationRunning || m_engine->isBusy()) return;
+    if (ProbeRsEngine::probeStillListed(m_connectedProbe, selectors)) return;
+
+    appendLog("WARNING", "The probe was unplugged. The connection is closed.");
+    m_engine->disconnectTarget();
 }
 
 void MainWindow::onEngineDisconnected() {
