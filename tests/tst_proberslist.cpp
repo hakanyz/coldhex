@@ -69,6 +69,34 @@ private slots:
         QCOMPARE(args.at(i + 1), QString("C:/chips/apm32.yaml"));
     }
 
+    void helperArgumentsSelectChipProbeProtocolAndSpeed() {
+        TargetSettings t;
+        t.chipName = "STM32F407VG";
+        t.speedKhz = 15000;
+        t.probeId = "0483:3748";
+        const QStringList args = ProbeRsEngine::helperTargetArgsFor(t);
+        QCOMPARE(args, (QStringList{"--chip", "STM32F407VG", "--protocol", "swd", "--speed", "15000",
+                                    "--probe", "0483:3748"}));
+        QVERIFY(!args.contains("--non-interactive"));  // an option of the probe-rs tool only
+
+        t.protocol = DebugProtocol::Jtag;
+        t.connectUnderReset = true;
+        t.chipDescriptionPath = "C:/chips/apm.yaml";
+        const QStringList more = ProbeRsEngine::helperTargetArgsFor(t);
+        QVERIFY(more.contains("jtag"));
+        QVERIFY(more.contains("--connect-under-reset"));
+        QVERIFY(more.contains("--chip-description-path"));
+    }
+
+    void helperFormatFollowsTheFileExtension() {
+        QCOMPARE(ProbeRsEngine::helperFormat("app.hex"), QString("hex"));
+        QCOMPARE(ProbeRsEngine::helperFormat("APP.IHEX"), QString("hex"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.bin"), QString("bin"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.elf"), QString("elf"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.axf"), QString("elf"));
+        QVERIFY(ProbeRsEngine::helperFormat("app.txt").isEmpty());  // probe-rs decides for these
+    }
+
     void parsesChipInfoMemoryRegions() {
         const QString out =
             "STM32F407VG\n"

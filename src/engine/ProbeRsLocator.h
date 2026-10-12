@@ -14,4 +14,10 @@ public:
 
     // The folders searched, in order, before PATH.
     static QStringList candidateDirs(const QString& appDir, const QString& homeDir);
+
+    // Finds the coldhex-flash helper that reports real erase and program progress. It is only
+    // looked for next to the program (or in the same folders as probe-rs), never on PATH. The
+    // environment variable COLDHEX_FLASH_HELPER can name a file for a development build.
+    // Returns an empty string when there is none; ColdHex then uses probe-rs alone.
+    static QString findHelper(const QString& appDir);
 };

@@ -62,6 +62,8 @@ set(SOURCES
     src/engine/IProgrammerEngine.h
     src/engine/ProbeRsEngine.h
     src/engine/ProbeRsEngine.cpp
+    src/engine/FlashProgressParser.h
+    src/engine/FlashProgressParser.cpp
     src/engine/ConnectionAdvice.h
     src/engine/ConnectionAdvice.cpp
 )
@@ -105,6 +107,31 @@ set_target_properties(coldhex PROPERTIES
 
 qt_finalize_executable(coldhex)
 
+# The coldhex-flash helper (Rust, tools/coldhex-flash) reports real progress while erasing and
+# programming. It is built with cargo and put next to the program. Without cargo, or with
+# -DCOLDHEX_BUILD_FLASH_HELPER=OFF, ColdHex still works: it then uses the probe-rs command line
+# alone and shows no percentage for those steps.
+option(COLDHEX_BUILD_FLASH_HELPER "Build the coldhex-flash helper (needs cargo)" ON)
+set(COLDHEX_FLASH_HELPER_EXE "")
+if(COLDHEX_BUILD_FLASH_HELPER)
+    find_program(COLDHEX_CARGO cargo HINTS "$ENV{USERPROFILE}/.cargo/bin" "$ENV{HOME}/.cargo/bin")
+    if(COLDHEX_CARGO)
+        set(COLDHEX_FLASH_HELPER_DIR "${CMAKE_BINARY_DIR}/coldhex-flash-target")
+        set(COLDHEX_FLASH_HELPER_EXE "${COLDHEX_FLASH_HELPER_DIR}/release/coldhex-flash${CMAKE_EXECUTABLE_SUFFIX}")
+        add_custom_target(coldhex_flash_helper ALL
+            COMMAND "${COLDHEX_CARGO}" build --release --locked
+                    --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/tools/coldhex-flash/Cargo.toml"
+                    --target-dir "${COLDHEX_FLASH_HELPER_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${COLDHEX_FLASH_HELPER_EXE}" "$<TARGET_FILE_DIR:coldhex>"
+            COMMENT "Building the coldhex-flash helper"
+            VERBATIM)
+        add_dependencies(coldhex coldhex_flash_helper)
+    else()
+        message(STATUS "cargo not found: building without the coldhex-flash helper (no progress percentage)")
+    endif()
+endif()
+
 # ---------------------------------------------------------------------------
 # Installation and packaging
 # ---------------------------------------------------------------------------
@@ -138,6 +165,10 @@ install(FILES
     packaging/licenses/Qt-LGPL-3.0.txt
     packaging/licenses/GPL-3.0.txt
     DESTINATION ${COLDHEX_NOTICE_DEST})
+
+if(COLDHEX_FLASH_HELPER_EXE)
+    install(PROGRAMS "${COLDHEX_FLASH_HELPER_EXE}" DESTINATION ${COLDHEX_PROBE_RS_DEST})
+endif()
 
 if(COLDHEX_PROBE_RS_DIR)
     find_program(COLDHEX_PROBE_RS_EXE NAMES probe-rs PATHS "${COLDHEX_PROBE_RS_DIR}" NO_DEFAULT_PATH REQUIRED)
@@ -225,6 +256,8 @@ if(COLDHEX_BUILD_TESTS)
     add_executable(tst_probelist
         tests/tst_proberslist.cpp
         src/engine/ProbeRsEngine.cpp
+    src/engine/FlashProgressParser.h
+    src/engine/FlashProgressParser.cpp
         src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
@@ -240,6 +273,8 @@ if(COLDHEX_BUILD_TESTS)
         src/core/ChipCatalog.cpp
         src/core/ChipCatalog.h
         src/engine/ProbeRsEngine.cpp
+    src/engine/FlashProgressParser.h
+    src/engine/FlashProgressParser.cpp
         src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsLocator.cpp
@@ -275,6 +310,8 @@ if(COLDHEX_BUILD_TESTS)
         src/engine/UsbScanner.cpp
         src/engine/UsbScanner.h
         src/engine/ProbeRsEngine.cpp
+    src/engine/FlashProgressParser.h
+    src/engine/FlashProgressParser.cpp
         src/engine/ConnectionAdvice.cpp
         src/engine/ChipDescription.cpp
         src/engine/ProbeRsEngine.h
@@ -324,6 +361,15 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_theme PRIVATE src)
     target_link_libraries(tst_theme PRIVATE Qt6::Widgets Qt6::Test)
     add_test(NAME tst_theme COMMAND tst_theme)
+
+    add_executable(tst_flashprogressparser
+        tests/tst_flashprogressparser.cpp
+        src/engine/FlashProgressParser.cpp
+        src/engine/FlashProgressParser.h
+    )
+    target_include_directories(tst_flashprogressparser PRIVATE src)
+    target_link_libraries(tst_flashprogressparser PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_flashprogressparser COMMAND tst_flashprogressparser)
 
     add_executable(tst_operationstatus
         tests/tst_operationstatus.cpp

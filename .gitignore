@@ -43,3 +43,6 @@ Desktop.ini
 
 # Downloaded during packaging (probe-rs)
 third_party/
+
+# Rust build output of the coldhex-flash helper
+tools/**/target/
