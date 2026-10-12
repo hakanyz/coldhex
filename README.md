@@ -48,10 +48,15 @@ Download the package for your system from the
 | Probe | Windows | Linux |
 |---|---|---|
 | ST-Link | Install the official ST-LINK USB driver from st.com | Nothing to do – the `.deb` installs the USB rules |
-| J-Link | probe-rs needs the WinUSB driver (for example installed with [Zadig](https://zadig.akeo.ie)). SEGGER's own tools no longer find the probe afterwards. | Nothing to do – the `.deb` installs the USB rules |
+| J-Link | Nothing to do **if SEGGER's J-Link software is installed** (as most Keil users have): ColdHex then drives SEGGER's own `JLink.exe`, the probe keeps SEGGER's driver and Keil keeps working. Without that software probe-rs needs the WinUSB driver (for example installed with [Zadig](https://zadig.akeo.ie)), and SEGGER's own tools no longer find the probe afterwards. | Install SEGGER's J-Link software (`JLinkExe`) for the same behaviour; the `.deb` installs the USB rules |
 | CMSIS-DAP | No driver needed | Nothing to do – the `.deb` installs the USB rules |
 
 If a driver is missing, **Help > System Check** says so.
+
+**Speed with a J-Link:** an older or simple J-Link (and long or ungrounded wires) can be unreliable
+above a few hundred kHz. Writes then fail with "Verification of RAMCode failed", and reads can come
+back shifted by a word without any error. If that happens, set the speed to 100 kHz. ST-Link and
+CMSIS-DAP probes did not show this.
 
 ## Quick start
 

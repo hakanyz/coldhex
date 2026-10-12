@@ -40,6 +40,16 @@ set(SOURCES
     src/engine/BundledChips.h
     src/engine/BundledChips.cpp
     src/engine/ProbeRsLocator.h
+    src/engine/JLinkCommands.h
+    src/engine/JLinkCommands.cpp
+    src/engine/JLinkLogProgress.h
+    src/engine/JLinkLogProgress.cpp
+    src/engine/JLinkLocator.h
+    src/engine/JLinkLocator.cpp
+    src/engine/JLinkEngine.h
+    src/engine/JLinkEngine.cpp
+    src/engine/RoutingEngine.h
+    src/engine/RoutingEngine.cpp
     src/engine/ProbeRsLocator.cpp
     src/engine/UsbScanner.h
     src/engine/UsbScanner.cpp
@@ -361,6 +371,40 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_theme PRIVATE src)
     target_link_libraries(tst_theme PRIVATE Qt6::Widgets Qt6::Test)
     add_test(NAME tst_theme COMMAND tst_theme)
+
+    add_executable(tst_jlink
+        tests/tst_jlink.cpp
+        src/engine/JLinkCommands.cpp
+        src/engine/JLinkCommands.h
+        src/engine/JLinkLocator.cpp
+        src/engine/JLinkLocator.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_jlink PRIVATE src)
+    target_link_libraries(tst_jlink PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_jlink COMMAND tst_jlink)
+
+    add_executable(tst_jlinklogprogress
+        tests/tst_jlinklogprogress.cpp
+        src/engine/JLinkLogProgress.cpp
+        src/engine/JLinkLogProgress.h
+    )
+    target_include_directories(tst_jlinklogprogress PRIVATE src)
+    target_link_libraries(tst_jlinklogprogress PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_jlinklogprogress COMMAND tst_jlinklogprogress)
+
+    add_executable(tst_routingengine
+        tests/tst_routingengine.cpp
+        tests/MockEngine.h
+        src/engine/RoutingEngine.cpp
+        src/engine/RoutingEngine.h
+        src/engine/JLinkCommands.cpp
+        src/engine/JLinkCommands.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_routingengine PRIVATE src tests)
+    target_link_libraries(tst_routingengine PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_routingengine COMMAND tst_routingengine)
 
     add_executable(tst_flashprogressparser
         tests/tst_flashprogressparser.cpp
