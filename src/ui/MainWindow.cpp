@@ -3,6 +3,8 @@
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
 #include "engine/ProbeRsLocator.h"
+#include "engine/JLinkLocator.h"
+#include "engine/RoutingEngine.h"
 #include "SystemCheckDialog.h"
 #include <QTimer>
 #include <QStandardPaths>
@@ -35,10 +37,23 @@
 #include <QHeaderView>
 #include <QTextDocument>
 
+namespace {
+
+// The engine for J-Link probes that keeps SEGGER's USB driver, or null when SEGGER's J-Link
+// software is not installed (J-Link probes then need the WinUSB driver and go through probe-rs).
+JLinkEngine* makeJLinkEngine(ProbeRsEngine* chipData, QObject* parent) {
+    const QString commander = JLinkLocator::findDefault();
+    return commander.isEmpty() ? nullptr : new JLinkEngine(commander, chipData, parent);
+}
+
+}  // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       ui(new Ui::MainWindow),
-      m_engine(new ProbeRsEngine(this)),
+      m_probeRsEngine(new ProbeRsEngine(this)),
+      m_jlinkEngine(makeJLinkEngine(m_probeRsEngine, this)),
+      m_engine(new RoutingEngine(m_probeRsEngine, m_jlinkEngine, this)),
       m_coordinator(new FlashCoordinator(m_engine, this)),
       m_memoryModel(new HexMemoryModel(this))
 {
@@ -68,12 +83,16 @@ MainWindow::MainWindow(QWidget *parent)
     setupToolBarWidgets();
 
     m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
+    if (m_jlinkEngine) {
+        appendLog("INFO", QString("J-Link software found (%1): J-Link probes keep SEGGER's USB driver.")
+                              .arg(m_jlinkEngine->commanderPath()));
+    }
 
     // Engine Signals
-    connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
-    connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
-    connect(m_engine, &ProbeRsEngine::disconnected, this, &MainWindow::onEngineDisconnected);
-    connect(m_engine, &ProbeRsEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
+    connect(m_engine, &IProgrammerEngine::logMessage, this, &MainWindow::onEngineLogMessage);
+    connect(m_engine, &IProgrammerEngine::connected, this, &MainWindow::onEngineConnected);
+    connect(m_engine, &IProgrammerEngine::disconnected, this, &MainWindow::onEngineDisconnected);
+    connect(m_engine, &IProgrammerEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
     // Coordinator Signals
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);

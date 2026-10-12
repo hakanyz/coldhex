@@ -11,6 +11,7 @@
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
 #include "engine/ProbeRsEngine.h"
+#include "engine/JLinkEngine.h"
 #include "HexMemoryModel.h"
 #include "ConsoleDock.h"
 #include "OperationStatus.h"
@@ -84,7 +85,9 @@ private:
     QString currentProbeRsPath() const;
 
     Ui::MainWindow *ui;
-    ProbeRsEngine *m_engine;
+    ProbeRsEngine *m_probeRsEngine;
+    JLinkEngine *m_jlinkEngine;  // null when SEGGER's J-Link software is not installed
+    IProgrammerEngine *m_engine;  // routes to one of the two
     FlashCoordinator *m_coordinator;
     HexMemoryModel *m_memoryModel;
     ConsoleDock* m_console = nullptr;
