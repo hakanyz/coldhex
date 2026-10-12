@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QToolButton>
 
 ConsoleDock::ConsoleDock(QMainWindow* window, QDockWidget* dock, QPlainTextEdit* log,
@@ -132,7 +133,11 @@ void ConsoleDock::setMinimized(bool minimized) {
         m_window->resizeDocks({m_dock}, {m_dock->titleBarWidget()->sizeHint().height()}, Qt::Vertical);
     } else {
         m_dock->widget()->setMaximumHeight(QWIDGETSIZE_MAX);
-        m_window->resizeDocks({m_dock}, {m_restoreHeight}, Qt::Vertical);
+        // The layout only learns about the lifted limit on the next event loop pass; resizing
+        // right away is ignored and leaves the console at its minimized size.
+        QTimer::singleShot(0, this, [this]() {
+            m_window->resizeDocks({m_dock}, {m_restoreHeight}, Qt::Vertical);
+        });
         m_title->setText("Console Output");
         m_title->setStyleSheet("font-weight: bold;");
     }
