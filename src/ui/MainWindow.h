@@ -87,6 +87,7 @@ private:
     FlashCoordinator *m_coordinator;
     HexMemoryModel *m_memoryModel;
     ConsoleDock* m_console = nullptr;
+    bool m_lastCommandWasErase = false;
     ChipSelector* m_chipSelector = nullptr;
     ProbeSelector* m_probeSelector = nullptr;
 

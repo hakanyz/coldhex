@@ -298,6 +298,7 @@ void MainWindow::onEraseTriggered() {
     if (!prepareEngine()) return;
 
     m_isOperationRunning = true;
+    m_lastCommandWasErase = true;
     updateUiState();
     m_engine->eraseTarget(true);
 }
@@ -682,6 +683,16 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
     if (m_sequenceRunning) return;
     m_isOperationRunning = false;
     updateUiState();
+
+    if (m_lastCommandWasErase) {
+        m_lastCommandWasErase = false;
+        if (success) {
+            // The data read earlier no longer matches the chip, so drop it instead of showing it.
+            m_targetReadData.clear();
+            updateMemoryViewer();
+            appendLog("INFO", "Flash erased. Press Read to see the new contents (an erased flash reads 0xFF).");
+        }
+    }
 }
 
 void MainWindow::onReadTargetTriggered() {
