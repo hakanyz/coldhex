@@ -9,7 +9,8 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 
 ![ColdHex main window](docs/screenshot.png)
 
-> **Status: beta.** The logic is covered by automated tests, but programming has so far seen only
+> **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing and the
+> progress display were tried on a real ST-Link with an STM32F407. Programming has so far seen only
 > limited testing on real hardware. Please report problems through the issue tracker.
 
 ## Features
