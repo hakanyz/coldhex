@@ -5,8 +5,7 @@
 HexMemoryModel::HexMemoryModel(QObject *parent)
     : QAbstractTableModel(parent)
 {
-    // Initialize with default 256 bytes empty memory (0xFF)
-    m_data = QByteArray(256, static_cast<char>(0xFF));
+    // No data yet: the table shows rows of "--", not bytes that could pass for erased flash.
 }
 
 int HexMemoryModel::rowCount(const QModelIndex &parent) const {
@@ -96,6 +95,6 @@ void HexMemoryModel::setMemoryData(uint32_t baseAddress, const QByteArray &data)
 void HexMemoryModel::clear() {
     beginResetModel();
     m_baseAddress = 0x08000000;
-    m_data = QByteArray(256, static_cast<char>(0xFF));
+    m_data.clear();
     endResetModel();
 }

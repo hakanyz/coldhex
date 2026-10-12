@@ -31,7 +31,9 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QHeaderView>
+#include <QTextDocument>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -41,6 +43,18 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+
+    // The Firmware Slots box takes the spare height of the settings panel, so its bottom edge
+    // lines up with the bottom of the memory viewer next to it.
+    ui->layoutSettings->setStretchFactor(ui->groupFirmwareSlots, 1);
+    ui->layoutSlots->addStretch(1);  // keeps the slot rows at the top when the box grows
+
+    // The console has a fixed height that shows kConsoleLines lines.
+    constexpr int kConsoleLines = 12;
+    ui->textLog->setFixedHeight(kConsoleLines * QFontMetrics(ui->textLog->font()).lineSpacing()
+                                + 2 * ui->textLog->frameWidth()
+                                + 2 * qRound(ui->textLog->document()->documentMargin()));
+
     m_console = new ConsoleDock(this, ui->dockConsoleOutput, ui->textLog, ui->actionClearLog, ui->actionSaveLog);
     m_chipSelector = new ChipSelector(this, ui->comboManufacturer, ui->comboModel, m_engine);
     connect(m_chipSelector, &ChipSelector::message, this, &MainWindow::appendLog);
@@ -157,7 +171,8 @@ void MainWindow::restoreSettings() {
     ui->editSlot2Path->setText(s.slot2Path);
 
     if (!s.geometry.isEmpty()) restoreGeometry(s.geometry);
-    if (!s.windowState.isEmpty()) restoreState(s.windowState);
+    // The dock layout (windowState) is deliberately not restored: sizes saved for a window of
+    // another size left the console drawn past the bottom of the window on start-up.
 }
 
 void MainWindow::saveSettings() {
@@ -298,6 +313,7 @@ void MainWindow::onEraseTriggered() {
     if (!prepareEngine()) return;
 
     m_isOperationRunning = true;
+    m_lastCommandWasErase = true;
     updateUiState();
     m_engine->eraseTarget(true);
 }
@@ -682,6 +698,16 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
     if (m_sequenceRunning) return;
     m_isOperationRunning = false;
     updateUiState();
+
+    if (m_lastCommandWasErase) {
+        m_lastCommandWasErase = false;
+        if (success) {
+            // The data read earlier no longer matches the chip, so drop it instead of showing it.
+            m_targetReadData.clear();
+            updateMemoryViewer();
+            appendLog("INFO", "Flash erased. Press Read to see the new contents (an erased flash reads 0xFF).");
+        }
+    }
 }
 
 void MainWindow::onReadTargetTriggered() {
