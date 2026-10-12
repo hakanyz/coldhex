@@ -136,6 +136,7 @@ void ProbeSelector::onProbeListReady(bool success, const QList<ProbeInfo>& probe
 
     QStringList keys;
     for (const ProbeInfo& p : probes) keys << p.selector();
+    emit probesListed(keys);  // also when nothing changed: the window decides what a missing probe means
     const bool changed = !m_listSeen || (keys != m_lastKeys);
     m_listSeen = true;
     m_lastKeys = keys;

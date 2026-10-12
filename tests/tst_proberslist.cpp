@@ -69,6 +69,54 @@ private slots:
         QCOMPARE(args.at(i + 1), QString("C:/chips/apm32.yaml"));
     }
 
+    void helperArgumentsSelectChipProbeProtocolAndSpeed() {
+        TargetSettings t;
+        t.chipName = "STM32F407VG";
+        t.speedKhz = 15000;
+        t.probeId = "0483:3748";
+        const QStringList args = ProbeRsEngine::helperTargetArgsFor(t);
+        QCOMPARE(args, (QStringList{"--chip", "STM32F407VG", "--protocol", "swd", "--speed", "15000",
+                                    "--probe", "0483:3748"}));
+        QVERIFY(!args.contains("--non-interactive"));  // an option of the probe-rs tool only
+
+        t.protocol = DebugProtocol::Jtag;
+        t.connectUnderReset = true;
+        t.chipDescriptionPath = "C:/chips/apm.yaml";
+        const QStringList more = ProbeRsEngine::helperTargetArgsFor(t);
+        QVERIFY(more.contains("jtag"));
+        QVERIFY(more.contains("--connect-under-reset"));
+        QVERIFY(more.contains("--chip-description-path"));
+    }
+
+    void helperFormatFollowsTheFileExtension() {
+        QCOMPARE(ProbeRsEngine::helperFormat("app.hex"), QString("hex"));
+        QCOMPARE(ProbeRsEngine::helperFormat("APP.IHEX"), QString("hex"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.bin"), QString("bin"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.elf"), QString("elf"));
+        QCOMPARE(ProbeRsEngine::helperFormat("app.axf"), QString("elf"));
+        QVERIFY(ProbeRsEngine::helperFormat("app.txt").isEmpty());  // probe-rs decides for these
+    }
+
+    void aConnectionNoticesWhenItsProbeIsGone() {
+        const QStringList both{"0483:3748", "1366:0101:004294967295"};
+        QVERIFY(ProbeRsEngine::probeStillListed("0483:3748", both));
+        QVERIFY(ProbeRsEngine::probeStillListed("1366:0101:004294967295", both));
+        QVERIFY(!ProbeRsEngine::probeStillListed("0483:3748", {"1366:0101:004294967295"}));
+        QVERIFY(!ProbeRsEngine::probeStillListed("0483:3748", {}));
+    }
+
+    void aConnectionWithoutAChosenProbeNeedsAnyProbe() {
+        QVERIFY(ProbeRsEngine::probeStillListed("", {"0483:3748"}));
+        QVERIFY(!ProbeRsEngine::probeStillListed("", {}));
+    }
+
+    void helperFormatArgumentsAddTheBaseAddressOnlyForBinFiles() {
+        QCOMPARE(ProbeRsEngine::helperFormatArgs("app.hex", 0x08008000), (QStringList{"--format", "hex"}));
+        QCOMPARE(ProbeRsEngine::helperFormatArgs("app.bin", 0x08008000),
+                 (QStringList{"--format", "bin", "--base-address", "0x08008000"}));
+        QVERIFY(ProbeRsEngine::helperFormatArgs("app.txt", 0).isEmpty());
+    }
+
     void parsesChipInfoMemoryRegions() {
         const QString out =
             "STM32F407VG\n"

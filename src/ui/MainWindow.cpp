@@ -31,7 +31,9 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QHeaderView>
+#include <QTextDocument>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -41,16 +43,31 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+
+    // The Firmware Slots box takes the spare height of the settings panel, so its bottom edge
+    // lines up with the bottom of the memory viewer next to it.
+    ui->layoutSettings->setStretchFactor(ui->groupFirmwareSlots, 1);
+    ui->layoutSlots->addStretch(1);  // keeps the slot rows at the top when the box grows
+
+    // The console has a fixed height that shows kConsoleLines lines.
+    constexpr int kConsoleLines = 12;
+    ui->textLog->setFixedHeight(kConsoleLines * QFontMetrics(ui->textLog->font()).lineSpacing()
+                                + 2 * ui->textLog->frameWidth()
+                                + 2 * qRound(ui->textLog->document()->documentMargin()));
+
     m_console = new ConsoleDock(this, ui->dockConsoleOutput, ui->textLog, ui->actionClearLog, ui->actionSaveLog);
     m_chipSelector = new ChipSelector(this, ui->comboManufacturer, ui->comboModel, m_engine);
     connect(m_chipSelector, &ChipSelector::message, this, &MainWindow::appendLog);
     m_probeSelector = new ProbeSelector(this, ui->comboProbe, m_engine, [this]() { return m_isOperationRunning || m_engine->isBusy(); });
     connect(m_probeSelector, &ProbeSelector::message, this, &MainWindow::appendLog);
     connect(m_probeSelector, &ProbeSelector::status, ui->statusBar, &QStatusBar::showMessage);
+    connect(m_probeSelector, &ProbeSelector::probesListed, this, &MainWindow::onProbesListed);
     setAcceptDrops(true);
 
     setupUiCustomizations();
     setupToolBarWidgets();
+
+    m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
 
     // Engine Signals
     connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
@@ -62,7 +79,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);
     connect(m_coordinator, &FlashCoordinator::sequenceFinished, this, &MainWindow::onSequenceFinished);
     connect(m_coordinator, &FlashCoordinator::stepChanged, this, &MainWindow::onStepChanged);
-    connect(m_coordinator, &FlashCoordinator::totalProgressChanged, this, &MainWindow::onTotalProgressChanged);
     connect(m_coordinator, &FlashCoordinator::autoSpeedFallbackTriggered, this, &MainWindow::onAutoSpeedFallbackTriggered);
 
     // Toolbar Actions
@@ -157,7 +173,8 @@ void MainWindow::restoreSettings() {
     ui->editSlot2Path->setText(s.slot2Path);
 
     if (!s.geometry.isEmpty()) restoreGeometry(s.geometry);
-    if (!s.windowState.isEmpty()) restoreState(s.windowState);
+    // The dock layout (windowState) is deliberately not restored: sizes saved for a window of
+    // another size left the console drawn past the bottom of the window on start-up.
 }
 
 void MainWindow::saveSettings() {
@@ -298,6 +315,7 @@ void MainWindow::onEraseTriggered() {
     if (!prepareEngine()) return;
 
     m_isOperationRunning = true;
+    m_lastCommandWasErase = true;
     updateUiState();
     m_engine->eraseTarget(true);
 }
@@ -574,6 +592,7 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
+        m_connectedProbe = m_probeSelector->selector();
         ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
         appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
     } else {
@@ -592,6 +611,16 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     m_manualConnect = false;
 }
 
+// The probe was unplugged while the program shows "connected": nothing else would tell it, so
+// the connection is closed here. Not during an operation: that one fails by itself.
+void MainWindow::onProbesListed(const QStringList& selectors) {
+    if (!m_engine->isConnected() || m_isOperationRunning || m_engine->isBusy()) return;
+    if (ProbeRsEngine::probeStillListed(m_connectedProbe, selectors)) return;
+
+    appendLog("WARNING", "The probe was unplugged. The connection is closed.");
+    m_engine->disconnectTarget();
+}
+
 void MainWindow::onEngineDisconnected() {
     m_isOperationRunning = false;
     ui->statusBar->showMessage("Disconnected");
@@ -602,7 +631,6 @@ void MainWindow::onEngineDisconnected() {
 void MainWindow::onSequenceStarted() {
     m_sequenceRunning = true;
     m_isOperationRunning = true;
-    ui->progressBar->setValue(0);
     updateUiState();
     appendLog("INFO", "Programming sequence initiated.");
 }
@@ -612,7 +640,6 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
-        ui->progressBar->setValue(100);
         appendLog("SUCCESS", message);
     } else {
         appendLog("ERROR", message);
@@ -621,10 +648,6 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
 
 void MainWindow::onStepChanged(const QString& stepDescription, int stepIndex, int totalSteps) {
     appendLog("INFO", QString("[%1/%2] %3").arg(stepIndex).arg(totalSteps).arg(stepDescription));
-}
-
-void MainWindow::onTotalProgressChanged(int overallPercentage) {
-    ui->progressBar->setValue(overallPercentage);
 }
 
 void MainWindow::onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz) {
@@ -682,6 +705,16 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
     if (m_sequenceRunning) return;
     m_isOperationRunning = false;
     updateUiState();
+
+    if (m_lastCommandWasErase) {
+        m_lastCommandWasErase = false;
+        if (success) {
+            // The data read earlier no longer matches the chip, so drop it instead of showing it.
+            m_targetReadData.clear();
+            updateMemoryViewer();
+            appendLog("INFO", "Flash erased. Press Read to see the new contents (an erased flash reads 0xFF).");
+        }
+    }
 }
 
 void MainWindow::onReadTargetTriggered() {

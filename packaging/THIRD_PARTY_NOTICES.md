@@ -22,6 +22,15 @@ The command line tools of probe-rs are dual-licensed under the MIT and Apache-2.
 (`probe-rs-LICENSE-MIT`, `probe-rs-LICENSE-APACHE` in this package).
 https://github.com/probe-rs/probe-rs
 
+The `coldhex-flash` helper (`tools/coldhex-flash`) is linked with the probe-rs library and 152
+other Rust crates (`tools/coldhex-flash/Cargo.lock` lists them with their versions). probe-rs
+itself is covered by the licences above. The other crates are under permissive licences: MIT,
+Apache-2.0, BSD-2-Clause, Zlib, Unlicense, CC0-1.0, 0BSD, BSL-1.0 and Unicode-3.0, usually as a
+choice between several of them (crates that also offer the GPL are used under MIT). The one
+exception is `serialport` (MPL-2.0, https://github.com/serialport/serialport-rs), which is used
+unmodified; its source is available at that address. The licence text and copyright notice of
+each crate are in its source package on https://crates.io.
+
 ## Chip descriptions for Geehy APM32 devices
 
 The files in `resources/chips` were generated with probe-rs `target-gen` from Geehy's
