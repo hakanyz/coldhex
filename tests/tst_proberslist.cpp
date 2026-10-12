@@ -97,6 +97,13 @@ private slots:
         QVERIFY(ProbeRsEngine::helperFormat("app.txt").isEmpty());  // probe-rs decides for these
     }
 
+    void helperFormatArgumentsAddTheBaseAddressOnlyForBinFiles() {
+        QCOMPARE(ProbeRsEngine::helperFormatArgs("app.hex", 0x08008000), (QStringList{"--format", "hex"}));
+        QCOMPARE(ProbeRsEngine::helperFormatArgs("app.bin", 0x08008000),
+                 (QStringList{"--format", "bin", "--base-address", "0x08008000"}));
+        QVERIFY(ProbeRsEngine::helperFormatArgs("app.txt", 0).isEmpty());
+    }
+
     void parsesChipInfoMemoryRegions() {
         const QString out =
             "STM32F407VG\n"

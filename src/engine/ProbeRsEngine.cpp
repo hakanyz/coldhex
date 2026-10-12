@@ -130,6 +130,16 @@ QString ProbeRsEngine::helperFormat(const QString& filePath) {
     return {};
 }
 
+QStringList ProbeRsEngine::helperFormatArgs(const QString& filePath, uint32_t baseAddress) {
+    const QString format = helperFormat(filePath);
+    if (format.isEmpty()) return {};
+    QStringList args{"--format", format};
+    if (format == "bin") {
+        args << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
+    }
+    return args;
+}
+
 // probe-rs only honours --base-address together with --binary-format bin.
 QStringList ProbeRsEngine::imageFormatArgs(const QString& filePath, uint32_t baseAddress) {
     const QString suffix = QFileInfo(filePath).suffix();
@@ -203,14 +213,11 @@ void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, b
     if (isBusy()) return;
 
     // The helper reports erase, program and verify progress while it writes.
-    const QString format = helperFormat(filePath);
-    if (!m_helperPath.isEmpty() && !format.isEmpty()) {
+    const QStringList formatArgs = helperFormatArgs(filePath, baseAddress);
+    if (!m_helperPath.isEmpty() && !formatArgs.isEmpty()) {
         QStringList helperArgs{"download"};
         helperArgs += helperTargetArgsFor(m_target);
-        helperArgs << "--format" << format;
-        if (format == "bin") {
-            helperArgs << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
-        }
+        helperArgs += formatArgs;
         if (verify) helperArgs << "--verify";
         helperArgs << filePath;
         runCommand(helperArgs, EngineState::Programming,
@@ -230,6 +237,17 @@ void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, b
 
 void ProbeRsEngine::verifyFile(const QString& filePath, uint32_t baseAddress) {
     if (isBusy()) return;
+
+    const QStringList formatArgs = helperFormatArgs(filePath, baseAddress);
+    if (!m_helperPath.isEmpty() && !formatArgs.isEmpty()) {
+        QStringList helperArgs{"verify"};
+        helperArgs += helperTargetArgsFor(m_target);
+        helperArgs += formatArgs;
+        helperArgs << filePath;
+        runCommand(helperArgs, EngineState::Verifying,
+                   QString("Verifying: %1").arg(QFileInfo(filePath).fileName()), true);
+        return;
+    }
 
     QStringList args = QStringList{"verify"} + targetArgs();
     args += imageFormatArgs(filePath, baseAddress);
@@ -538,11 +556,21 @@ void ProbeRsEngine::readMemory(uint64_t address, uint64_t byteCount, const QStri
     const bool wordAligned = (address % 4 == 0) && (byteCount % 4 == 0);
     const QString width = wordAligned ? "b32" : "b8";
     const uint64_t count = wordAligned ? byteCount / 4 : byteCount;
+    const QString action = QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0'));
+
+    // The helper reads in chunks and reports each one. It reads whole words only.
+    if (!m_helperPath.isEmpty() && wordAligned) {
+        QStringList helperArgs{"read"};
+        helperArgs += helperTargetArgsFor(m_target);
+        helperArgs << "--address" << QString("0x%1").arg(address, 8, 16, QLatin1Char('0'))
+                   << "--length" << QString::number(byteCount) << "--output" << outputFile;
+        runCommand(helperArgs, EngineState::Reading, action, true);
+        return;
+    }
 
     QStringList args = QStringList{"read"} + targetArgs();
     args << "--output" << outputFile << "--format" << "binary"
          << width << QString("0x%1").arg(address, 8, 16, QLatin1Char('0')) << QString::number(count);
 
-    runCommand(args, EngineState::Reading,
-               QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0')));
+    runCommand(args, EngineState::Reading, action);
 }

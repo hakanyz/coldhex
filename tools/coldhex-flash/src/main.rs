@@ -10,6 +10,8 @@
 //   coldhex-flash erase    <target options> [--range 0x08000000:0x08100000] [--mass]
 //   coldhex-flash download <file> <target options> --format hex|bin|elf
 //                          [--base-address 0x08000000] [--verify]
+//   coldhex-flash verify   <file> <target options> --format hex|bin|elf [--base-address 0x08000000]
+//   coldhex-flash read     <target options> --address 0x08000000 --length 1048576 --output FILE
 //
 // Target options:
 //   --chip NAME   --chip-description-path FILE.yaml   --protocol swd|jtag
@@ -33,11 +35,12 @@
 
 use probe_rs::config::{MemoryRegion, Registry};
 use probe_rs::flashing::{
-    self, BinOptions, DownloadOptions, ElfOptions, FlashProgress, ProgressEvent, ProgressOperation,
+    self, BinOptions, DownloadOptions, ElfOptions, FlashProgress, ImageLoader, ProgressEvent,
+    ProgressOperation,
 };
 use probe_rs::probe::list::Lister;
 use probe_rs::probe::{DebugProbeSelector, WireProtocol};
-use probe_rs::{Permissions, Session};
+use probe_rs::{MemoryInterface, Permissions, Session};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
@@ -229,10 +232,28 @@ fn run_erase(args: &Args) -> Result<(), String> {
     Ok(())
 }
 
+/// The firmware file's format as a value probe-rs understands. For `bin` the address where the
+/// file belongs comes from `--base-address`.
+fn image_loader(args: &Args) -> Result<Box<dyn ImageLoader>, String> {
+    match args.required("--format")?.as_str() {
+        "hex" => Ok(Box::new(flashing::HexLoader)),
+        "elf" => Ok(Box::new(flashing::ElfLoader(ElfOptions::default()))),
+        "bin" => {
+            let mut bin = BinOptions::default();
+            if let Some(text) = args.option("--base-address") {
+                bin.base_address = Some(parse_address(text)?);
+            }
+            Ok(Box::new(flashing::BinLoader(bin)))
+        }
+        other => Err(format!("unknown --format {other} (use hex, bin or elf)")),
+    }
+}
+
 /// `download`: writes a firmware file. probe-rs erases only the sectors it needs, writes the
 /// pages and, with `--verify`, reads everything back; each of these reports its own progress.
 fn run_download(args: &Args) -> Result<(), String> {
     let path = args.positional.first().ok_or("missing firmware file")?;
+    let loader = image_loader(args)?;
     let mut session = connect(args)?;
 
     let mut options = DownloadOptions::default();
@@ -240,31 +261,67 @@ fn run_download(args: &Args) -> Result<(), String> {
     options.verify = args.flag("--verify");
     options.do_chip_erase = args.flag("--chip-erase");
 
-    // `download_file_with_options` wants the format as a value of its own type.
-    let result = match args.required("--format")?.as_str() {
-        "hex" => flashing::download_file_with_options(&mut session, path, flashing::HexLoader, options),
-        "elf" => flashing::download_file_with_options(
-            &mut session,
-            path,
-            flashing::ElfLoader(ElfOptions::default()),
-            options,
-        ),
-        "bin" => {
-            let mut bin = BinOptions::default();
-            if let Some(text) = args.option("--base-address") {
-                bin.base_address = Some(parse_address(text)?);
-            }
-            flashing::download_file_with_options(&mut session, path, flashing::BinLoader(bin), options)
+    flashing::download_file_with_options(&mut session, path, loader, options)
+        .map_err(|e| format!("download failed: {e}"))
+}
+
+/// `verify`: compares the chip with a firmware file and writes nothing. A difference is an
+/// error ("the chip does not match the file").
+fn run_verify(args: &Args) -> Result<(), String> {
+    let path = args.positional.first().ok_or("missing firmware file")?;
+    let loader = image_loader(args)?;
+    let mut session = connect(args)?;
+
+    let flash_loader = flashing::build_loader(&mut session, path, loader, None)
+        .map_err(|e| format!("cannot read {path}: {e}"))?;
+    let mut progress = FlashProgress::new(report);
+    flash_loader
+        .verify(&mut session, &mut progress)
+        .map_err(|e| format!("verification failed: {e}"))
+}
+
+/// How many bytes `read` fetches per request. Each request is one progress step.
+const READ_CHUNK: u64 = 64 * 1024;
+
+/// `read`: copies a memory area of the chip into a file. The library reports no progress for a
+/// plain memory read, so the area is read in chunks and every chunk is reported here.
+fn run_read(args: &Args) -> Result<(), String> {
+    let address = parse_address(args.required("--address")?)?;
+    let text = args.required("--length")?;
+    let length: u64 = text.parse().map_err(|_| format!("bad --length value {text}"))?;
+    let output = args.required("--output")?;
+    if length == 0 || length % 4 != 0 || address % 4 != 0 {
+        return Err("--address and --length must be multiples of 4 and the length not zero".to_string());
+    }
+
+    let mut session = connect(args)?;
+    let mut core = session.core(0).map_err(|e| format!("cannot access the core: {e}"))?;
+    let mut file = std::fs::File::create(output).map_err(|e| format!("cannot create {output}: {e}"))?;
+
+    emit(json!({"event": "plan", "op": "read", "total": length}));
+    emit(json!({"event": "started", "op": "read"}));
+
+    let mut words = vec![0u32; (READ_CHUNK / 4) as usize];
+    let mut done = 0;
+    while done < length {
+        let bytes = READ_CHUNK.min(length - done);
+        let chunk = &mut words[..(bytes / 4) as usize];
+        // 32-bit reads are much faster over the debug link than byte reads.
+        core.read_32(address + done, chunk).map_err(|e| format!("read failed at 0x{:08x}: {e}", address + done))?;
+        for word in chunk.iter() {
+            file.write_all(&word.to_le_bytes()).map_err(|e| format!("cannot write {output}: {e}"))?;
         }
-        other => return Err(format!("unknown --format {other} (use hex, bin or elf)")),
-    };
-    result.map_err(|e| format!("download failed: {e}"))
+        done += bytes;
+        emit(json!({"event": "progress", "op": "read", "bytes": bytes}));
+    }
+    emit(json!({"event": "finished", "op": "read"}));
+    Ok(())
 }
 
 fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect(); // skip the program name
     let Some(command) = raw.first().cloned() else {
-        emit(json!({"event": "result", "ok": false, "error": "no command (use erase or download)"}));
+        emit(json!({"event": "result", "ok": false, "error": "no command (use erase, download, verify or read)"}));
         std::process::exit(1);
     };
     let args = parse_args(&raw[1..]);
@@ -272,6 +329,8 @@ fn main() {
     let outcome = match command.as_str() {
         "erase" => run_erase(&args),
         "download" => run_download(&args),
+        "verify" => run_verify(&args),
+        "read" => run_read(&args),
         other => Err(format!("unknown command {other}")),
     };
 

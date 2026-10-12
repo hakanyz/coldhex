@@ -89,7 +89,7 @@ The program looks for `probe-rs` next to itself, then on `PATH`. Install it from
 
 ### The coldhex-flash helper (optional, needs Rust)
 
-Erase and program show a real percentage in the status bar only when the small Rust helper in
+Erase, program, verify and read show a real percentage in the status bar only when the small Rust helper in
 `tools/coldhex-flash` is built. CMake builds it when it finds `cargo` ([rustup.rs](https://rustup.rs))
 and puts it next to the program. Without `cargo`, or with `-DCOLDHEX_BUILD_FLASH_HELPER=OFF`, the
 same steps run through the probe-rs tool and show only the time they take. On Windows with MinGW

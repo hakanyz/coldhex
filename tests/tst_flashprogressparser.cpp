@@ -51,6 +51,14 @@ private slots:
         QCOMPARE(event.text, QString("Verifying 90%"));
     }
 
+    void aReadShowsItsOwnName() {
+        FlashProgressParser parser;
+        parser.feed(R"({"event":"plan","op":"read","total":1000})");
+        const auto event = parser.feed(R"({"event":"progress","op":"read","bytes":400})");
+        QCOMPARE(event.percent, 40);
+        QCOMPARE(event.text, QString("Reading 40%"));
+    }
+
     void anOperationAnnouncedTwiceAddsUpItsTotals() {
         // One announcement per flash area.
         FlashProgressParser parser;

@@ -57,6 +57,10 @@ public:
     // "hex", "bin" or "elf" for the file name, or an empty string for a type the helper cannot write.
     static QString helperFormat(const QString& filePath);
 
+    // "--format hex" (and "--base-address 0x..." for a bin file), or an empty list for a type the
+    // helper cannot handle.
+    static QStringList helperFormatArgs(const QString& filePath, uint32_t baseAddress);
+
     void setExecutablePath(const QString& path);
     QString executablePath() const;
 

@@ -13,6 +13,7 @@ QString FlashProgressParser::activityName(const QString& op) {
     if (op == "erase") return "Erasing";
     if (op == "program") return "Programming";
     if (op == "verify") return "Verifying";
+    if (op == "read") return "Reading";
     if (op == "fill") return "Restoring";
     return op;
 }
