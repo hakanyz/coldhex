@@ -18,6 +18,10 @@ public:
     static QStringList defaultRoots();
     static QString defaultExeName();
 
+    // Orders names so that a run of digits counts by its value ("V99" before "V914a"); negative, zero
+    // or positive like strcmp.
+    static int naturalCompare(const QString& a, const QString& b);
+
     // find() with the defaults.
     static QString findDefault();
 };
