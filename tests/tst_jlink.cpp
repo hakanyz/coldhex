@@ -208,6 +208,16 @@ private slots:
     }
 
     // --- finding the SEGGER software --------------------------------------------------------
+    void namesAreOrderedByTheNumbersInThem() {
+        QVERIFY(JLinkLocator::naturalCompare("JLink_V99", "JLink_V914a") < 0);  // 99 < 914
+        QVERIFY(JLinkLocator::naturalCompare("JLink_V914a", "JLink_V810") > 0);
+        QVERIFY(JLinkLocator::naturalCompare("JLink_V810", "JLink_V0810") == 0);  // leading zeros do not count
+        QVERIFY(JLinkLocator::naturalCompare("JLink_v810", "JLink_V810") == 0);   // nor does the case
+        QVERIFY(JLinkLocator::naturalCompare("JLink", "JLink_V810") < 0);          // the shorter one is first
+        QVERIFY(JLinkLocator::naturalCompare("JLink_V810b", "JLink_V810a") > 0);
+        QVERIFY(JLinkLocator::naturalCompare("", "") == 0);
+    }
+
     void findsTheNewestVersionFolder() {
         QTemporaryDir root;
         QVERIFY(root.isValid());
