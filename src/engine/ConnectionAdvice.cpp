@@ -23,6 +23,16 @@ QString ConnectionAdvice::explain(const QString& out) {
                        "Chips probe-rs lacks need a chip description file (Tools > Add Chip Description File)."});
     }
 
+    // The probe is listed, but opening it failed because of the driver. Cables are not the cause.
+    if (has(out, "incompatible driver") || has(out, "WinUSB driver")) {
+        return advice("The probe is found, but it has the wrong USB driver.",
+                      {"probe-rs needs the WinUSB driver; the driver of the probe's maker is installed instead.",
+                       "Install WinUSB with Zadig (zadig.akeo.ie): choose the probe, select WinUSB, click Install.",
+                       "Afterwards the maker's own tools (for a J-Link: SEGGER's) no longer find this probe until "
+                       "its driver is restored in Device Manager.",
+                       "Help > System Check shows the driver of each probe."});
+    }
+
     if (has(out, "No connected probes were found")) {
         return advice("The selected probe was not found.",
                       {"Check that the probe is plugged in and shown in the Probe box.",
