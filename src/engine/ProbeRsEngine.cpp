@@ -31,6 +31,7 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     // Prefer a probe-rs shipped with ColdHex, then PATH, then the installer's default folder.
     const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
     if (!found.isEmpty()) m_executablePath = found;
+    m_helperPath = ProbeRsLocator::findHelper(QCoreApplication::applicationDirPath());
 }
 
 ProbeRsEngine::~ProbeRsEngine() {
@@ -46,6 +47,14 @@ void ProbeRsEngine::setExecutablePath(const QString& path) {
 
 QString ProbeRsEngine::executablePath() const {
     return m_executablePath;
+}
+
+void ProbeRsEngine::setHelperPath(const QString& path) {
+    m_helperPath = path;
+}
+
+QString ProbeRsEngine::helperPath() const {
+    return m_helperPath;
 }
 
 bool ProbeRsEngine::isConnected() const {
@@ -91,6 +100,42 @@ QStringList ProbeRsEngine::targetArgsFor(const TargetSettings& target) {
     }
     if (target.connectUnderReset) {
         args << "--connect-under-reset";
+    }
+    return args;
+}
+
+QStringList ProbeRsEngine::helperTargetArgsFor(const TargetSettings& target) {
+    QStringList args = {"--chip", target.chipName};
+    if (!target.chipDescriptionPath.isEmpty()) {
+        args << "--chip-description-path" << target.chipDescriptionPath;
+    }
+    args << "--protocol" << (target.protocol == DebugProtocol::Jtag ? "jtag" : "swd");
+    if (target.speedKhz > 0) {
+        args << "--speed" << QString::number(target.speedKhz);
+    }
+    if (!target.probeId.isEmpty()) {
+        args << "--probe" << target.probeId;
+    }
+    if (target.connectUnderReset) {
+        args << "--connect-under-reset";
+    }
+    return args;
+}
+
+QString ProbeRsEngine::helperFormat(const QString& filePath) {
+    const QString suffix = QFileInfo(filePath).suffix();
+    if (suffix.compare("bin", Qt::CaseInsensitive) == 0) return "bin";
+    if (suffix.compare("hex", Qt::CaseInsensitive) == 0 || suffix.compare("ihex", Qt::CaseInsensitive) == 0) return "hex";
+    if (suffix.compare("elf", Qt::CaseInsensitive) == 0 || suffix.compare("axf", Qt::CaseInsensitive) == 0) return "elf";
+    return {};
+}
+
+QStringList ProbeRsEngine::helperFormatArgs(const QString& filePath, uint32_t baseAddress) {
+    const QString format = helperFormat(filePath);
+    if (format.isEmpty()) return {};
+    QStringList args{"--format", format};
+    if (format == "bin") {
+        args << "--base-address" << QString("0x%1").arg(baseAddress, 8, 16, QLatin1Char('0'));
     }
     return args;
 }
@@ -147,11 +192,38 @@ void ProbeRsEngine::eraseTarget(bool fullErase) {
     if (isBusy()) return;
     Q_UNUSED(fullErase);
 
+    // The helper erases the main flash sector by sector and reports every sector, so the user
+    // sees a real percentage. It needs to know the flash area, which comes from the chip data.
+    if (!m_helperPath.isEmpty()) {
+        const ChipMemoryMap memory = queryMemoryMap(m_target.chipName, m_target.chipDescriptionPath);
+        if (const MemoryRegion* flash = memory.mainFlash()) {
+            QStringList args{"erase"};
+            args += helperTargetArgsFor(m_target);
+            args << "--range" << QString("0x%1:0x%2").arg(flash->start, 8, 16, QLatin1Char('0'))
+                                                       .arg(flash->end(), 8, 16, QLatin1Char('0'));
+            runCommand(args, EngineState::Erasing, "Erasing target chip (Chip Erase)...", true);
+            return;
+        }
+    }
+
     runCommand(QStringList{"erase"} + targetArgs(), EngineState::Erasing, "Erasing target chip (Chip Erase)...");
 }
 
 void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, bool verify) {
     if (isBusy()) return;
+
+    // The helper reports erase, program and verify progress while it writes.
+    const QStringList formatArgs = helperFormatArgs(filePath, baseAddress);
+    if (!m_helperPath.isEmpty() && !formatArgs.isEmpty()) {
+        QStringList helperArgs{"download"};
+        helperArgs += helperTargetArgsFor(m_target);
+        helperArgs += formatArgs;
+        if (verify) helperArgs << "--verify";
+        helperArgs << filePath;
+        runCommand(helperArgs, EngineState::Programming,
+                   QString("Flashing: %1").arg(QFileInfo(filePath).fileName()), true);
+        return;
+    }
 
     QStringList args = QStringList{"download"} + targetArgs();
     if (verify) {
@@ -165,6 +237,17 @@ void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, b
 
 void ProbeRsEngine::verifyFile(const QString& filePath, uint32_t baseAddress) {
     if (isBusy()) return;
+
+    const QStringList formatArgs = helperFormatArgs(filePath, baseAddress);
+    if (!m_helperPath.isEmpty() && !formatArgs.isEmpty()) {
+        QStringList helperArgs{"verify"};
+        helperArgs += helperTargetArgsFor(m_target);
+        helperArgs += formatArgs;
+        helperArgs << filePath;
+        runCommand(helperArgs, EngineState::Verifying,
+                   QString("Verifying: %1").arg(QFileInfo(filePath).fileName()), true);
+        return;
+    }
 
     QStringList args = QStringList{"verify"} + targetArgs();
     args += imageFormatArgs(filePath, baseAddress);
@@ -260,7 +343,13 @@ void ProbeRsEngine::onProbeListErrorOccurred(QProcess::ProcessError error) {
     }
 }
 
-void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription) {
+void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription,
+                               bool useHelper) {
+    const QString program = useHelper ? m_helperPath : m_executablePath;
+    m_helperRunning = useHelper;
+    m_helperResultSeen = false;
+    m_helperResultOk = false;
+    m_helperParser.reset();
     m_state = targetState;
     m_cancelRequested = false;
     m_stdoutBuffer.clear();
@@ -269,9 +358,9 @@ void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState,
     m_currentActionDescription = actionDescription;
 
     emit operationStarted(actionDescription);
-    emit logMessage(QString("[CMD] %1 %2").arg(m_executablePath, args.join(' ')), EngineLogLevel::Debug);
+    emit logMessage(QString("[CMD] %1 %2").arg(program, args.join(' ')), EngineLogLevel::Debug);
 
-    m_process->start(m_executablePath, args);
+    m_process->start(program, args);
 }
 
 void ProbeRsEngine::drainOutput(QByteArray& buffer, const QByteArray& chunk, bool isError, bool flushRemainder) {
@@ -304,6 +393,31 @@ void ProbeRsEngine::onProcessReadyReadStdErr() {
 void ProbeRsEngine::parseOutputLine(const QString& line, bool isError) {
     if (line.isEmpty()) return;
 
+    // The helper writes JSON lines to stdout. They carry the progress and the result; the raw
+    // lines are not for the log. What it writes to stderr (a crash message) is handled as usual.
+    if (m_helperRunning && !isError && line.startsWith('{')) {
+        const FlashHelperEvent event = m_helperParser.feed(line.toUtf8());
+        switch (event.kind) {
+        case FlashHelperEvent::Kind::Progress:
+            emit progressChanged(event.percent, event.text);
+            break;
+        case FlashHelperEvent::Kind::Message:
+            emit logMessage(event.text, EngineLogLevel::Info);
+            break;
+        case FlashHelperEvent::Kind::Result:
+            m_helperResultSeen = true;
+            m_helperResultOk = event.ok;
+            if (!event.ok) {
+                m_outputLines << event.text;  // ConnectionAdvice reads this to explain the failure
+                emit logMessage(event.text, EngineLogLevel::Error);
+            }
+            break;
+        case FlashHelperEvent::Kind::Ignored:
+            break;
+        }
+        return;
+    }
+
     if (m_outputLines.size() < 200) m_outputLines << line;
 
     auto match = m_progressRegex.match(line);
@@ -328,6 +442,7 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
 
     if (m_cancelRequested) {
         m_cancelRequested = false;
+        m_helperRunning = false;
         m_state = EngineState::Idle;
         emit logMessage("Operation cancelled by user.", EngineLogLevel::Warning);
         emit operationFinished(false, "Operation cancelled.");
@@ -335,6 +450,9 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     }
 
     bool success = (exitCode == 0 && exitStatus == QProcess::NormalExit);
+    // The helper states its outcome itself; a result of "failed" wins over the exit code.
+    if (m_helperRunning && m_helperResultSeen) success = success && m_helperResultOk;
+    m_helperRunning = false;
     EngineState completedState = m_state;
     m_state = EngineState::Idle;
 
@@ -361,7 +479,11 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
 
 void ProbeRsEngine::onProcessErrorOccurred(QProcess::ProcessError error) {
     if (error == QProcess::FailedToStart) {
-        QString msg = QString("Failed to start '%1'. Please make sure probe-rs CLI is installed and available in PATH.").arg(m_executablePath);
+        const bool helperFailed = m_helperRunning;
+        m_helperRunning = false;
+        QString msg = helperFailed
+            ? QString("Failed to start '%1'. The coldhex-flash helper is missing or damaged; reinstall ColdHex.").arg(m_helperPath)
+            : QString("Failed to start '%1'. Please make sure probe-rs CLI is installed and available in PATH.").arg(m_executablePath);
         emit logMessage(msg, EngineLogLevel::Error);
         m_state = EngineState::Idle;
         emit operationFinished(false, msg);
@@ -434,11 +556,21 @@ void ProbeRsEngine::readMemory(uint64_t address, uint64_t byteCount, const QStri
     const bool wordAligned = (address % 4 == 0) && (byteCount % 4 == 0);
     const QString width = wordAligned ? "b32" : "b8";
     const uint64_t count = wordAligned ? byteCount / 4 : byteCount;
+    const QString action = QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0'));
+
+    // The helper reads in chunks and reports each one. It reads whole words only.
+    if (!m_helperPath.isEmpty() && wordAligned) {
+        QStringList helperArgs{"read"};
+        helperArgs += helperTargetArgsFor(m_target);
+        helperArgs << "--address" << QString("0x%1").arg(address, 8, 16, QLatin1Char('0'))
+                   << "--length" << QString::number(byteCount) << "--output" << outputFile;
+        runCommand(helperArgs, EngineState::Reading, action, true);
+        return;
+    }
 
     QStringList args = QStringList{"read"} + targetArgs();
     args << "--output" << outputFile << "--format" << "binary"
          << width << QString("0x%1").arg(address, 8, 16, QLatin1Char('0')) << QString::number(count);
 
-    runCommand(args, EngineState::Reading,
-               QString("Reading %1 bytes from 0x%2").arg(byteCount).arg(address, 8, 16, QLatin1Char('0')));
+    runCommand(args, EngineState::Reading, action);
 }

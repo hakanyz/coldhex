@@ -84,7 +84,7 @@ jobs:
       - name: Install build tools and Qt
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libudev1
+          sudo apt-get install -y cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libudev1 libudev-dev pkg-config
 
       - name: Download probe-rs
         run: |

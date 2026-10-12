@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FlashProgressParser.h"
 #include "IProgrammerEngine.h"
 #include <QProcess>
 #include <QRegularExpression>
@@ -50,8 +51,23 @@ public:
     // Parses the output of "probe-rs chip list".
     static QList<ChipEntry> parseChipList(const QString& output);
 
+    // The arguments of the coldhex-flash helper that select chip, probe, protocol and speed.
+    static QStringList helperTargetArgsFor(const TargetSettings& target);
+
+    // "hex", "bin" or "elf" for the file name, or an empty string for a type the helper cannot write.
+    static QString helperFormat(const QString& filePath);
+
+    // "--format hex" (and "--base-address 0x..." for a bin file), or an empty list for a type the
+    // helper cannot handle.
+    static QStringList helperFormatArgs(const QString& filePath, uint32_t baseAddress);
+
     void setExecutablePath(const QString& path);
     QString executablePath() const;
+
+    // The coldhex-flash helper reports real progress while erasing and programming. Without it
+    // (empty path) the same work is done by the probe-rs command line tool, without a percentage.
+    void setHelperPath(const QString& path);
+    QString helperPath() const;
 
 private slots:
     void onProcessReadyReadStdOut();
@@ -64,13 +80,15 @@ private slots:
     void onProbeListErrorOccurred(QProcess::ProcessError error);
 
 private:
-    void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription);
+    void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription,
+                    bool useHelper = false);
     void parseOutputLine(const QString& line, bool isError);
     QStringList targetArgs() const;
     static QStringList imageFormatArgs(const QString& filePath, uint32_t baseAddress);
     void drainOutput(QByteArray& buffer, const QByteArray& chunk, bool isError, bool flushRemainder = false);
 
     QString m_executablePath = "probe-rs";
+    QString m_helperPath;
     QProcess* m_process = nullptr;
     QProcess* m_chipListProcess = nullptr;
     QProcess* m_probeListProcess = nullptr;
@@ -85,4 +103,10 @@ private:
     QString m_currentActionDescription;
 
     QRegularExpression m_progressRegex;
+
+    // State of a running coldhex-flash command.
+    bool m_helperRunning = false;
+    bool m_helperResultSeen = false;
+    bool m_helperResultOk = false;
+    FlashProgressParser m_helperParser;
 };

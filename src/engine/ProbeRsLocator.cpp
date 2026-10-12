@@ -1,5 +1,6 @@
 #include "ProbeRsLocator.h"
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 
 QStringList ProbeRsLocator::candidateDirs(const QString& appDir, const QString& homeDir) {
@@ -8,6 +9,13 @@ QStringList ProbeRsLocator::candidateDirs(const QString& appDir, const QString& 
          << QDir::cleanPath(appDir + "/probe-rs")
          << QDir::cleanPath(appDir + "/../lib/coldhex");
     return dirs;
+}
+
+QString ProbeRsLocator::findHelper(const QString& appDir) {
+    const QString fromEnvironment = qEnvironmentVariable("COLDHEX_FLASH_HELPER");
+    if (!fromEnvironment.isEmpty() && QFileInfo::exists(fromEnvironment)) return fromEnvironment;
+
+    return QStandardPaths::findExecutable("coldhex-flash", candidateDirs(appDir, QString()));
 }
 
 QString ProbeRsLocator::find(const QString& appDir, const QString& homeDir) {

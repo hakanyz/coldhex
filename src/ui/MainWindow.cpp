@@ -66,6 +66,8 @@ MainWindow::MainWindow(QWidget *parent)
     setupUiCustomizations();
     setupToolBarWidgets();
 
+    m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
+
     // Engine Signals
     connect(m_engine, &ProbeRsEngine::logMessage, this, &MainWindow::onEngineLogMessage);
     connect(m_engine, &ProbeRsEngine::connected, this, &MainWindow::onEngineConnected);
@@ -76,7 +78,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_coordinator, &FlashCoordinator::sequenceStarted, this, &MainWindow::onSequenceStarted);
     connect(m_coordinator, &FlashCoordinator::sequenceFinished, this, &MainWindow::onSequenceFinished);
     connect(m_coordinator, &FlashCoordinator::stepChanged, this, &MainWindow::onStepChanged);
-    connect(m_coordinator, &FlashCoordinator::totalProgressChanged, this, &MainWindow::onTotalProgressChanged);
     connect(m_coordinator, &FlashCoordinator::autoSpeedFallbackTriggered, this, &MainWindow::onAutoSpeedFallbackTriggered);
 
     // Toolbar Actions
@@ -618,7 +619,6 @@ void MainWindow::onEngineDisconnected() {
 void MainWindow::onSequenceStarted() {
     m_sequenceRunning = true;
     m_isOperationRunning = true;
-    ui->progressBar->setValue(0);
     updateUiState();
     appendLog("INFO", "Programming sequence initiated.");
 }
@@ -628,7 +628,6 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
     m_isOperationRunning = false;
     updateUiState();
     if (success) {
-        ui->progressBar->setValue(100);
         appendLog("SUCCESS", message);
     } else {
         appendLog("ERROR", message);
@@ -637,10 +636,6 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
 
 void MainWindow::onStepChanged(const QString& stepDescription, int stepIndex, int totalSteps) {
     appendLog("INFO", QString("[%1/%2] %3").arg(stepIndex).arg(totalSteps).arg(stepDescription));
-}
-
-void MainWindow::onTotalProgressChanged(int overallPercentage) {
-    ui->progressBar->setValue(overallPercentage);
 }
 
 void MainWindow::onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz) {

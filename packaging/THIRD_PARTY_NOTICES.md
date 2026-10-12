@@ -22,6 +22,11 @@ The command line tools of probe-rs are dual-licensed under the MIT and Apache-2.
 (`probe-rs-LICENSE-MIT`, `probe-rs-LICENSE-APACHE` in this package).
 https://github.com/probe-rs/probe-rs
 
+The `coldhex-flash` helper (`tools/coldhex-flash`) is linked with the probe-rs library and the
+Rust crates it depends on (`tools/coldhex-flash/Cargo.lock` lists them with their versions).
+probe-rs itself is covered by the licences above. The licences of the other crates still have to
+be listed here before a public release.
+
 ## Chip descriptions for Geehy APM32 devices
 
 The files in `resources/chips` were generated with probe-rs `target-gen` from Geehy's
