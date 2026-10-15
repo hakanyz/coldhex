@@ -77,6 +77,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_probeSelector, &ProbeSelector::message, this, &MainWindow::appendLog);
     connect(m_probeSelector, &ProbeSelector::status, ui->statusBar, &QStatusBar::showMessage);
     connect(m_probeSelector, &ProbeSelector::probesListed, this, &MainWindow::onProbesListed);
+    m_probeInspector = new ProbeInspector(this);
+    connect(m_probeInspector, &ProbeInspector::finished, this, &MainWindow::onProbeInspected);
     setAcceptDrops(true);
 
     setupUiCustomizations();
@@ -632,12 +634,34 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
 
 // The probe was unplugged while the program shows "connected": nothing else would tell it, so
 // the connection is closed here. Not during an operation: that one fails by itself.
+// Asks each newly seen probe once who it is and which voltage it sees, and writes the answer to
+// the console. A probe that is unplugged and plugged in again is asked again.
 void MainWindow::onProbesListed(const QStringList& selectors) {
+    m_inspectedProbes.intersect(QSet<QString>(selectors.begin(), selectors.end()));
+    const bool idle = !m_engine->isConnected() && !m_isOperationRunning && !m_engine->isBusy();
+    if (idle) {
+        for (const QString& selector : selectors) {
+            if (m_inspectedProbes.contains(selector)) continue;
+            m_inspectedProbes.insert(selector);
+            m_probeInspector->inspect(selector,
+                                      m_jlinkEngine ? m_jlinkEngine->commanderPath() : QString(),
+                                      m_probeRsEngine->helperPath());
+        }
+    }
+
     if (!m_engine->isConnected() || m_isOperationRunning || m_engine->isBusy()) return;
     if (ProbeRsEngine::probeStillListed(m_connectedProbe, selectors)) return;
 
     appendLog("WARNING", "The probe was unplugged. The connection is closed.");
     m_engine->disconnectTarget();
+}
+
+void MainWindow::onProbeInspected(const QString& selector, const ProbeDetails& details, bool ok, const QString& error) {
+    if (ok) {
+        appendLog("INFO", QString("Probe %1: %2").arg(selector, ProbeInspect::describe(details)));
+    } else {
+        appendLog("WARNING", QString("Probe %1: could not read its details: %2").arg(selector, error));
+    }
 }
 
 void MainWindow::onEngineDisconnected() {
