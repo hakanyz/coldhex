@@ -12,6 +12,8 @@
 #include "core/SlotValidator.h"
 #include "engine/ProbeRsEngine.h"
 #include "engine/JLinkEngine.h"
+#include "engine/ProbeInspector.h"
+#include <QSet>
 #include "HexMemoryModel.h"
 #include "ConsoleDock.h"
 #include "OperationStatus.h"
@@ -64,6 +66,7 @@ private slots:
     void onEngineConnected(bool success, const QString& chipInfo);
     void onEngineDisconnected();
     void onProbesListed(const QStringList& selectors);
+    void onProbeInspected(const QString& selector, const ProbeDetails& details, bool ok, const QString& error);
     void onSequenceStarted();
     void onSequenceFinished(bool success, const QString& message);
     void onStepChanged(const QString& stepDescription, int stepIndex, int totalSteps);
@@ -95,6 +98,8 @@ private:
     bool m_lastCommandWasErase = false;
     ChipSelector* m_chipSelector = nullptr;
     ProbeSelector* m_probeSelector = nullptr;
+    ProbeInspector* m_probeInspector = nullptr;
+    QSet<QString> m_inspectedProbes;  // probes whose details were already asked for
 
     // Additional toolbar widgets
     QComboBox *m_comboToolbarHexFile = nullptr;

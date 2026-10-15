@@ -53,6 +53,8 @@ set(SOURCES
     src/engine/ProbeRsLocator.cpp
     src/engine/UsbScanner.h
     src/engine/UsbScanner.cpp
+    src/engine/ProbeInspector.h
+    src/engine/ProbeInspector.cpp
     src/engine/SystemCheck.h
     src/engine/SystemCheck.cpp
     src/ui/SystemCheckDialog.h
@@ -383,6 +385,18 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_jlink PRIVATE src)
     target_link_libraries(tst_jlink PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_jlink COMMAND tst_jlink)
+
+    add_executable(tst_probeinspector
+        tests/tst_probeinspector.cpp
+        src/engine/ProbeInspector.cpp
+        src/engine/ProbeInspector.h
+        src/engine/JLinkCommands.cpp
+        src/engine/JLinkCommands.h
+        src/engine/IProgrammerEngine.h
+    )
+    target_include_directories(tst_probeinspector PRIVATE src)
+    target_link_libraries(tst_probeinspector PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_probeinspector COMMAND tst_probeinspector)
 
     add_executable(tst_jlinklogprogress
         tests/tst_jlinklogprogress.cpp
