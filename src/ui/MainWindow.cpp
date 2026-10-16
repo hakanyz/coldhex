@@ -614,8 +614,10 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     updateUiState();
     if (success) {
         m_connectedProbe = m_probeSelector->selector();
-        ui->statusBar->showMessage(QString("Connected to %1 via %2 at %3 kHz").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
-        appendLog("INFO", QString("Connected to %1 via %2 at %3 kHz.").arg(chipInfo, ui->comboInterface->currentText()).arg(ui->spinSpeed->value()));
+        ui->statusBar->showMessage(QString("Target answered via %1 at %2 kHz (chip: %3, as selected)").arg(ui->comboInterface->currentText()).arg(ui->spinSpeed->value()).arg(chipInfo));
+        // The wires work and the target answered. The chip name is the user's selection: nothing here
+        // checks that the chip behind the probe really is that one.
+        appendLog("INFO", QString("The target answered via %1 at %2 kHz. Chip: %3 (as selected, not verified).").arg(ui->comboInterface->currentText()).arg(ui->spinSpeed->value()).arg(chipInfo));
     } else {
         ui->statusBar->showMessage("Connection Failed");
         appendLog("ERROR", "Connection failed.");
