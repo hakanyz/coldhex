@@ -12,6 +12,7 @@
 //                          [--base-address 0x08000000] [--verify]
 //   coldhex-flash verify   <file> <target options> --format hex|bin|elf [--base-address 0x08000000]
 //   coldhex-flash read     <target options> --address 0x08000000 --length 1048576 --output FILE
+//   coldhex-flash info     [--probe VID:PID[:SERIAL]]   (only the probe: no chip is needed)
 //
 // Target options:
 //   --chip NAME   --chip-description-path FILE.yaml   --protocol swd|jtag
@@ -23,6 +24,8 @@
 //   {"event":"progress","op":"erase","bytes":131072}   this many MORE bytes are done
 //   {"event":"finished","op":"erase"}   or   {"event":"failed","op":"erase"}
 //   {"event":"message","text":"..."}                    a note from the flash algorithm
+//   {"event":"probe","name":"STLink V2","voltage":3.28}   answer of `info`; voltage is null when
+//                                                        the probe cannot measure it
 //   {"event":"result","ok":true}   or   {"event":"result","ok":false,"error":"..."}
 // The exit code is 0 after ok:true and 1 after ok:false.
 //
@@ -173,6 +176,29 @@ fn connect(args: &Args) -> Result<Session, String> {
     session.map_err(|e| format!("cannot connect to {chip}: {e}"))
 }
 
+/// `info`: opens the probe without attaching to a chip and reports its name and the voltage it
+/// measures on the target's VTref pin. Probes that cannot measure it (CMSIS-DAP) report null.
+fn run_info(args: &Args) -> Result<(), String> {
+    let lister = Lister::new();
+    let mut probe = match args.option("--probe") {
+        Some(text) => {
+            let selector: DebugProbeSelector =
+                text.parse().map_err(|e| format!("bad --probe value {text}: {e}"))?;
+            lister.open(selector).map_err(|e| format!("cannot open probe {text}: {e}"))?
+        }
+        None => {
+            let all = lister.list_all();
+            let first = all.first().ok_or("no debug probe found")?;
+            first.open().map_err(|e| format!("cannot open the probe: {e}"))?
+        }
+    };
+    let name = probe.get_name();
+    // An error here means "cannot tell", the same as Ok(None): both are reported as null.
+    let voltage = probe.get_target_voltage().ok().flatten();
+    emit(json!({"event": "probe", "name": name, "voltage": voltage}));
+    Ok(())
+}
+
 /// Reads an address like 0x1000 (hexadecimal, with or without the 0x).
 fn parse_address(text: &str) -> Result<u64, String> {
     let digits = text.trim_start_matches("0x").trim_start_matches("0X");
@@ -321,7 +347,7 @@ fn run_read(args: &Args) -> Result<(), String> {
 fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect(); // skip the program name
     let Some(command) = raw.first().cloned() else {
-        emit(json!({"event": "result", "ok": false, "error": "no command (use erase, download, verify or read)"}));
+        emit(json!({"event": "result", "ok": false, "error": "no command (use erase, download, verify, read or info)"}));
         std::process::exit(1);
     };
     let args = parse_args(&raw[1..]);
@@ -331,6 +357,7 @@ fn main() {
         "download" => run_download(&args),
         "verify" => run_verify(&args),
         "read" => run_read(&args),
+        "info" => run_info(&args),
         other => Err(format!("unknown command {other}")),
     };
 
