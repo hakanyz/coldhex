@@ -14,7 +14,7 @@
 //   coldhex-flash read     <target options> --address 0x08000000 --length 1048576 --output FILE
 //   coldhex-flash capabilities --chip NAME   (what Lock/Unlock/status can do for the chip; no probe)
 //   coldhex-flash protection <target options>   (reports the read-out protection level)
-//   coldhex-flash lock     <target options>   (sets read-out protection level 1; F2/F4/F7 only)
+//   coldhex-flash lock     <target options>   (sets read-out protection level 1)
 //   coldhex-flash unlock   <target options>   (removes read-out protection level 1; the chip
 //                          erases its whole flash)
 //   coldhex-flash info     [--probe VID:PID[:SERIAL]]   (only the probe: no chip is needed)
@@ -361,7 +361,7 @@ enum Unlock {
     OptionByteErase(u8),
     /// Artery AT32: erase the user system data and write the FAP key 0xA5 at `usd`; the FLASH
     /// registers are at `flash`.
-    UsdErase { flash: u64, usd: u64 },
+    UsdErase { flash: u64, usd: u64, halfwords: usize },
     /// Flash controller of STM32F2/F4/F7 and its clones: write RDP = 0xAA into FLASH_OPTCR.
     OptionControl,
     /// STM32L4, G0, G4, C0, WB, WL: the RDP byte is the low byte of FLASH_OPTR at `base` + 0x20.
@@ -387,12 +387,14 @@ fn unlock_method(chip: &str) -> Option<Unlock> {
         Some(Unlock::OptionByteErase(0xAA))
     } else if starts(&["STM32F1", "GD32F1", "GD32F3", "GD32E1", "GD32E2", "APM32F1", "AIR32F1", "CH32F1"]) {
         Some(Unlock::OptionByteErase(0xA5))
-    } else if starts(&["AT32F403", "AT32F407", "AT32A403", "AT32F413", "AT32F415", "AT32F421", "AT32F425"]) {
-        Some(Unlock::UsdErase { flash: 0x4002_2000, usd: 0x1FFF_F800 })
+    } else if starts(&["AT32F403", "AT32F407", "AT32A403", "AT32F413"]) {
+        Some(Unlock::UsdErase { flash: 0x4002_2000, usd: 0x1FFF_F800, halfwords: 24 })
+    } else if starts(&["AT32F415", "AT32F421", "AT32F425"]) {
+        Some(Unlock::UsdErase { flash: 0x4002_2000, usd: 0x1FFF_F800, halfwords: 8 })
     } else if starts(&["AT32F423", "AT32F402", "AT32F405"]) {
-        Some(Unlock::UsdErase { flash: 0x4002_3C00, usd: 0x1FFF_F800 })
+        Some(Unlock::UsdErase { flash: 0x4002_3C00, usd: 0x1FFF_F800, halfwords: 8 })
     } else if starts(&["AT32F435", "AT32F437"]) {
-        Some(Unlock::UsdErase { flash: 0x4002_3C00, usd: 0x1FFF_C000 })
+        Some(Unlock::UsdErase { flash: 0x4002_3C00, usd: 0x1FFF_C000, halfwords: 34 })
     } else if starts(&["PY32F002A", "PY32F003", "PY32F030", "PY32F031"]) {
         // Same flash controller layout as the STM32L4 family (FLASH_OPTR, RDP 0xAA = none).
         Some(Unlock::OptionRegister(0x4002_2000))
@@ -850,7 +852,7 @@ fn run_capabilities(args: &Args) -> Result<(), String> {
     };
     let lock = matches!(
         method,
-        Some(Unlock::OptionControl | Unlock::OptionRegister(_) | Unlock::OptionRegisterNs(_) | Unlock::OptionStart(_) | Unlock::Eeprom(_))
+        Some(Unlock::OptionControl | Unlock::OptionByteErase(_) | Unlock::UsdErase { .. } | Unlock::OptionRegister(_) | Unlock::OptionRegisterNs(_) | Unlock::OptionStart(_) | Unlock::Eeprom(_))
     );
     emit(json!({"event": "capabilities", "status": status, "lock": lock, "unlock": method.is_some()}));
     Ok(())
@@ -893,17 +895,134 @@ fn run_protection(args: &Args) -> Result<(), String> {
     Ok(())
 }
 
+/// Reads `halfwords` 16-bit values starting at `address` (an even number of them).
+fn read_halfwords(core: &mut probe_rs::Core, address: u64, halfwords: usize) -> Result<Vec<u16>, String> {
+    let mut words = vec![0u32; halfwords / 2];
+    core.read_32(address, &mut words).map_err(|e| format!("cannot read the option bytes: {e}"))?;
+    Ok(words.iter().flat_map(|w| [*w as u16, (*w >> 16) as u16]).collect())
+}
+
+/// STM32F0/F1/F3 style lock. Setting RDP means erasing the whole option block, which also resets
+/// the user, data and write-protection bytes: so the block is read first and written back
+/// unchanged, except for RDP. The chip is not protected before this (the caller checks), so
+/// the erase does not erase the flash. Returns false when the chip is protected already.
+fn lock_option_byte_erase(core: &mut probe_rs::Core, key: u8) -> Result<bool, String> {
+    const BASE: u64 = 0x4002_2000;
+    const KEYR: u64 = BASE + 0x04;
+    const OPTKEYR: u64 = BASE + 0x08;
+    const SR: u64 = BASE + 0x0C;
+    const CR: u64 = BASE + 0x10;
+    const OBR: u64 = BASE + 0x1C;
+    const BSY: u32 = 1 << 0;
+    const OPTPG: u32 = 1 << 4;
+    const OPTER: u32 = 1 << 5;
+    const STRT: u32 = 1 << 6;
+    const OPTWRE: u32 = 1 << 9;
+    const OPTION_BYTES: u64 = 0x1FFF_F800;
+    let e = |what: &str, err: probe_rs::Error| format!("{what}: {err}");
+
+    let obr = core.read_word_32(OBR).map_err(|x| e("read FLASH_OBR", x))?;
+    if obr & (1 << 1) != 0 {
+        return Ok(false);
+    }
+    let mut block = read_halfwords(core, OPTION_BYTES, 8)?;
+    if block[0] & 0xFF != u16::from(key) {
+        return Err("the option bytes do not show the expected unprotected key; not changing them".to_string());
+    }
+
+    core.write_word_32(KEYR, FLASH_KEY1).map_err(|x| e("flash unlock", x))?;
+    core.write_word_32(KEYR, FLASH_KEY2).map_err(|x| e("flash unlock", x))?;
+    core.write_word_32(OPTKEYR, FLASH_KEY1).map_err(|x| e("option unlock", x))?;
+    core.write_word_32(OPTKEYR, FLASH_KEY2).map_err(|x| e("option unlock", x))?;
+    let cr = core.read_word_32(CR).map_err(|x| e("read FLASH_CR", x))?;
+    if cr & OPTWRE == 0 {
+        return Err("the option bytes could not be unlocked (FLASH_CR.OPTWRE stays 0)".to_string());
+    }
+
+    wait_not_busy(core, SR, BSY)?;
+    core.write_word_32(CR, cr | OPTER).map_err(|x| e("write FLASH_CR", x))?;
+    core.write_word_32(CR, cr | OPTER | STRT).map_err(|x| e("write FLASH_CR", x))?;
+    wait_not_busy(core, SR, BSY)?;
+    core.write_word_32(CR, cr & !OPTER).map_err(|x| e("write FLASH_CR", x))?;
+
+    // RDP 0x00 (level 1 on every family here; 0xCC would be level 2 and is never written),
+    // its complement 0xFF in the upper byte. Every other value goes back as it was.
+    block[0] = 0xFF00;
+    core.write_word_32(CR, cr | OPTPG).map_err(|x| e("write FLASH_CR", x))?;
+    for (index, value) in block.iter().enumerate() {
+        if *value == 0xFFFF {
+            continue; // already what an erased halfword holds
+        }
+        core.write_word_16(OPTION_BYTES + 2 * index as u64, *value).map_err(|x| e("write the option bytes", x))?;
+        wait_not_busy(core, SR, BSY)?;
+    }
+    core.write_word_32(CR, cr & !OPTPG).map_err(|x| e("write FLASH_CR", x))?;
+    Ok(true)
+}
+
+/// Artery AT32 lock: the chip is protected whenever the FAP halfword is not 0xA5, so the user
+/// system data is erased and everything except FAP is written back as it was. Returns false
+/// when the chip is protected already.
+fn lock_usd(core: &mut probe_rs::Core, flash: u64, usd: u64, halfwords: usize) -> Result<bool, String> {
+    let keyr = flash + 0x04;
+    let usd_unlock = flash + 0x08;
+    let sts = flash + 0x0C;
+    let ctrl = flash + 0x10;
+    let usd_reg = flash + 0x1C;
+    const OBF: u32 = 1 << 0;
+    const USDPRGM: u32 = 1 << 4;
+    const USDERS: u32 = 1 << 5;
+    const ERSTR: u32 = 1 << 6;
+    const USDULKS: u32 = 1 << 9;
+    const FAP: u32 = 1 << 1;
+    let e = |what: &str, err: probe_rs::Error| format!("{what}: {err}");
+
+    if core.read_word_32(usd_reg).map_err(|x| e("read FLASH_USD", x))? & FAP != 0 {
+        return Ok(false);
+    }
+    let block = read_halfwords(core, usd, halfwords)?;
+
+    core.write_word_32(keyr, FLASH_KEY1).map_err(|x| e("flash unlock", x))?;
+    core.write_word_32(keyr, FLASH_KEY2).map_err(|x| e("flash unlock", x))?;
+    core.write_word_32(usd_unlock, FLASH_KEY1).map_err(|x| e("user data unlock", x))?;
+    core.write_word_32(usd_unlock, FLASH_KEY2).map_err(|x| e("user data unlock", x))?;
+    let control = core.read_word_32(ctrl).map_err(|x| e("read FLASH_CTRL", x))?;
+    if control & USDULKS == 0 {
+        return Err("the user system data could not be unlocked (FLASH_CTRL.USDULKS stays 0)".to_string());
+    }
+
+    wait_not_busy(core, sts, OBF)?;
+    core.write_word_32(ctrl, control | USDERS).map_err(|x| e("write FLASH_CTRL", x))?;
+    core.write_word_32(ctrl, control | USDERS | ERSTR).map_err(|x| e("write FLASH_CTRL", x))?;
+    wait_not_busy(core, sts, OBF)?;
+    core.write_word_32(ctrl, control & !USDERS).map_err(|x| e("write FLASH_CTRL", x))?;
+
+    // FAP (index 0) stays erased = protected; the rest goes back.
+    core.write_word_32(ctrl, control | USDPRGM).map_err(|x| e("write FLASH_CTRL", x))?;
+    for (index, value) in block.iter().enumerate().skip(1) {
+        if *value == 0xFFFF {
+            continue;
+        }
+        core.write_word_16(usd + 2 * index as u64, *value).map_err(|x| e("write the user system data", x))?;
+        wait_not_busy(core, sts, OBF)?;
+    }
+    core.write_word_32(ctrl, control & !USDPRGM).map_err(|x| e("write FLASH_CTRL", x))?;
+    Ok(true)
+}
+
 /// `lock`: sets the read-out protection to level 1 (never level 2).
 fn run_lock(args: &Args) -> Result<(), String> {
     let chip = args.required("--chip")?.clone();
     let method = match unlock_method(&chip) {
-        Some(m @ (Unlock::OptionControl | Unlock::OptionRegister(_) | Unlock::OptionRegisterNs(_) | Unlock::OptionStart(_) | Unlock::Eeprom(_))) => m,
+        Some(m @ (Unlock::OptionControl | Unlock::OptionByteErase(_) | Unlock::UsdErase { .. } | Unlock::OptionRegister(_) | Unlock::OptionRegisterNs(_) | Unlock::OptionStart(_) | Unlock::Eeprom(_))) => m,
         _ => return Err(format!("locking is not supported for {chip} yet")),
     };
     let mut session = connect(args)?;
     let mut core = session.core(0).map_err(|e| format!("cannot access the core: {e}"))?;
     let changed = match method {
         Unlock::OptionControl => lock_option_control(&mut core)?,
+        Unlock::OptionByteErase(key) => lock_option_byte_erase(&mut core, key)?,
+        Unlock::UsdErase { flash, usd, halfwords } => lock_usd(&mut core, flash, usd, halfwords)?,
         Unlock::OptionRegister(base) => set_rdp_register(&mut core, base, RDP_LEVEL1)?,
         Unlock::OptionRegisterNs(base) => set_rdp_optr(&mut core, base, RegLayout::L5, RDP_LEVEL1)?,
         Unlock::OptionStart(base) => set_rdp_h7(&mut core, base, RDP_LEVEL1)?,
@@ -954,7 +1073,7 @@ fn run_unlock(args: &Args) -> Result<(), String> {
             let mut core = session.core(0).map_err(|e| format!("cannot access the core: {e}"))?;
             match method {
                 Unlock::OptionByteErase(key) => unlock_option_byte_erase(&mut core, key)?,
-                Unlock::UsdErase { flash, usd } => {
+                Unlock::UsdErase { flash, usd, .. } => {
                     if !unlock_usd_erase(&mut core, flash, usd)? {
                         emit(json!({"event": "message", "text": "The chip is not read-protected."}));
                         return Ok(());
@@ -1042,7 +1161,7 @@ mod tests {
         assert!(matches!(unlock_method("STM32L152RE"), Some(Unlock::Eeprom(0x4002_3C00))));
         // Families without a verified recipe stay unsupported instead of guessing.
         assert!(matches!(unlock_method("STM32F051R8"), Some(Unlock::OptionByteErase(0xAA))));
-        assert!(matches!(unlock_method("AT32F403ACGU7"), Some(Unlock::UsdErase { flash: 0x4002_2000, usd: 0x1FFF_F800 })));
+        assert!(matches!(unlock_method("AT32F403ACGU7"), Some(Unlock::UsdErase { flash: 0x4002_2000, usd: 0x1FFF_F800, .. })));
         assert!(matches!(unlock_method("AT32F437ZMT7"), Some(Unlock::UsdErase { usd: 0x1FFF_C000, .. })));
         assert!(matches!(unlock_method("PY32F030F16U6TR"), Some(Unlock::OptionRegister(0x4002_2000))));
         assert!(unlock_method("PY32F002B").is_none());
