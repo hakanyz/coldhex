@@ -197,6 +197,8 @@
     <addaction name="actionDisconnect"/>
     <addaction name="actionRead"/>
     <addaction name="actionErase"/>
+    <addaction name="actionLock"/>
+    <addaction name="actionUnlock"/>
     <addaction name="actionProgram"/>
     <addaction name="actionVerify"/>
     <addaction name="actionResetTarget"/>
@@ -254,6 +256,8 @@
    <addaction name="separator"/>
    <addaction name="actionRead"/>
    <addaction name="actionErase"/>
+   <addaction name="actionLock"/>
+   <addaction name="actionUnlock"/>
    <addaction name="actionProgram"/>
    <addaction name="actionVerify"/>
    <addaction name="separator"/>
@@ -627,6 +631,30 @@
    </property>
    <property name="toolTip">
     <string>Erase target chip</string>
+   </property>
+  </action>
+  <action name="actionLock">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/lock.svg</normaloff>:/icons/toolbar/lock.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Lock</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable read-out protection level 1 (the flash can no longer be read)</string>
+   </property>
+  </action>
+  <action name="actionUnlock">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/unlock.svg</normaloff>:/icons/toolbar/unlock.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Unlock</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove read-out protection level 1; the flash is erased</string>
    </property>
   </action>
   <action name="actionProgram">
