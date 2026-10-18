@@ -9,9 +9,11 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 
 ![ColdHex main window](docs/screenshot.png)
 
-> **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing and the
-> progress display were tried on a real ST-Link with an STM32F407. Programming has so far seen only
-> limited testing on real hardware. Please report problems through the issue tracker.
+> **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing, programming
+> and the progress display were tried on real hardware: ST-Link, J-Link and a CMSIS-DAP probe with an
+> STM32F407 and an APM32F407. Lock and Unlock were run on those two boards only; the other chip
+> families follow the vendors' own code and are listed in [docs/PROTECTION.md](docs/PROTECTION.md)
+> as not yet tried. Please report problems through the issue tracker.
 
 ## Features
 
@@ -21,8 +23,13 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
   address. Overlaps between the slots and writes outside the chip's flash are refused.
 - **Firmware formats** – Intel HEX (checksums are validated), raw binary with a start address, and ELF.
   Drag and drop files onto the window.
-- **Full workflow** – Connect, Erase, Program, Verify, Read the flash into a file, Reset, and Stop a
-  running operation. Erase / verify / reset after programming are optional.
+- **Full workflow** – Connect, Erase, Program, Verify, Read the flash (it is shown in the memory
+  viewer; Save writes it to a file), Reset, and Stop a running operation. Erase / verify / reset
+  after programming are optional.
+- **Read-out protection** – after connecting, ColdHex shows whether the chip is read-protected (level
+  1) and offers to remove it; Lock and Unlock buttons set and clear level 1. Level 2 is never
+  written. Chip families without a known method have the buttons greyed out, with the reason in the
+  tooltip. See [docs/PROTECTION.md](docs/PROTECTION.md) for the families and what is verified.
 - **Reliable connections** – SWD or JTAG, adjustable speed, *connect under reset*, and an automatic
   speed reduction that resumes the sequence at the step that failed.
 - **System Check** – on start-up ColdHex looks for probe-rs, connected probes and their drivers and
