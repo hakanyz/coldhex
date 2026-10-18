@@ -66,6 +66,14 @@ public:
     virtual bool isBusy() const = 0;
 
     virtual void eraseTarget(bool fullErase = true) = 0;
+    // Removes the read-out protection (level 1). The chip erases its whole flash while it does so.
+    // Finishes with operationFinished(false, ...) when no method is known for the chip.
+    virtual void unlockTarget() = 0;
+    // Sets the read-out protection to level 1 (never level 2). Reading the flash fails afterwards.
+    virtual void lockTarget() = 0;
+    // Asks what Lock and Unlock can do for a chip (no probe needed). The answer arrives through
+    // capabilitiesReady(); engines that cannot tell never answer, and the window keeps the buttons on.
+    virtual void requestCapabilities(const QString& chipName) = 0;
     virtual void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) = 0;
     virtual void verifyFile(const QString& filePath, uint32_t baseAddress) = 0;
     // Saves `byteCount` bytes starting at `address` to `outputFile` as raw binary.
@@ -80,6 +88,10 @@ public:
 
 signals:
     void connected(bool success, const QString& chipInfo);
+    // After a connection: the read-out protection of the chip, 0 = off, 1 or 2. Not sent when
+    // the level cannot be read for this chip.
+    void protectionDetected(int level);
+    void capabilitiesReady(const QString& chipName, bool canLock, bool canUnlock);
     void disconnected();
     void operationStarted(const QString& actionName);
     void progressChanged(int percentage, const QString& statusText);

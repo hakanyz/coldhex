@@ -148,6 +148,25 @@ void JLinkEngine::eraseTarget(bool) {
     run(JLinkCommands::eraseScript(flash->start, flash->end()), State::Erasing, "Erasing target chip (Chip Erase)...");
 }
 
+void JLinkEngine::unlockTarget() {
+    if (isBusy()) return;
+
+    // The unlock recipes run through the probe-rs helper. SEGGER's Commander is not wired to
+    // them yet; until then a J-Link needs the WinUSB driver (Zadig) to use the probe-rs engine.
+    emit logMessage("Unlock is not available through the SEGGER J-Link engine yet.", EngineLogLevel::Error);
+    QTimer::singleShot(0, this, [this]() { emit operationFinished(false, "Unlock not supported by this engine."); });
+}
+
+// The SEGGER engine has no Lock or Unlock: it stays silent, and the window decides.
+void JLinkEngine::requestCapabilities(const QString&) {}
+
+void JLinkEngine::lockTarget() {
+    if (isBusy()) return;
+
+    emit logMessage("Lock is not available through the SEGGER J-Link engine yet.", EngineLogLevel::Error);
+    QTimer::singleShot(0, this, [this]() { emit operationFinished(false, "Lock not supported by this engine."); });
+}
+
 void JLinkEngine::programFile(const QString& filePath, uint32_t baseAddress, bool) {
     if (isBusy()) return;
 
