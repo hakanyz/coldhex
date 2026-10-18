@@ -73,7 +73,7 @@ jobs:
           name: windows-packages
           path: |
             build/coldhex-*.zip
-            build/coldhex-*.exe
+            build/coldhex-*-win64.exe
 
   linux:
     name: Ubuntu 22.04 (.deb, .tar.gz)
