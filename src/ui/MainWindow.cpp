@@ -171,7 +171,7 @@ MainWindow::MainWindow(QWidget *parent)
             dialog->deleteLater();
         }
     });
-    appendLog("INFO", "ColdHex v0.1 started.");
+    appendLog("INFO", QString("ColdHex v%1 started.").arg(QApplication::applicationVersion()));
     updateUiState();
 }
 
@@ -798,7 +798,6 @@ void MainWindow::onProbeInspected(const QString& selector, const ProbeDetails& d
 void MainWindow::onEngineDisconnected() {
     m_isOperationRunning = false;
     ui->statusBar->showMessage("Disconnected");
-    appendLog("INFO", "Target Disconnected.");
     updateUiState();
 }
 
