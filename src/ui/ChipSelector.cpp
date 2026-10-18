@@ -91,7 +91,6 @@ void ChipSelector::onChipListReady(bool success, const QList<ChipEntry>& chips, 
     m_builtinChipsLoaded = success;
     if (success) {
         m_builtinChips = chips;
-        log("INFO", QString("Loaded %1 supported chips from probe-rs.").arg(chips.size()));
     } else {
         m_builtinChips.clear();
         log("ERROR", QString("Chip list unavailable: %1").arg(error));
@@ -139,8 +138,6 @@ void ChipSelector::rebuildCatalog() {
         for (const QString& name : names) {
             m_chips.append({"Chip file: " + family, name, path});
         }
-        log("INFO", QString("Chip description '%1': %2 chips (%3).")
-                        .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
     }
 
     QStringList allNames;
@@ -185,7 +182,8 @@ void ChipSelector::addChipFile() {
 
     QString family;
     QString error;
-    if (ChipDescription::variantNamesFromFile(path, &family, &error).isEmpty()) {
+    const QStringList names = ChipDescription::variantNamesFromFile(path, &family, &error);
+    if (names.isEmpty()) {
         log("ERROR", error);
         QMessageBox::warning(m_parent, "Invalid Chip Description", error);
         return;
@@ -193,6 +191,9 @@ void ChipSelector::addChipFile() {
 
     m_customChipFiles << path;
     rebuildCatalog();
+    // The only chip list message left: the user asked for this file, so say what it gave.
+    log("INFO", QString("Added chip description '%1': %2 chips (%3).")
+                    .arg(QFileInfo(path).fileName()).arg(names.size()).arg(family));
 }
 
 void ChipSelector::clearChipFiles() {
