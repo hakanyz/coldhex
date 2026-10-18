@@ -36,6 +36,12 @@ QString logScript(const QString& logFile);
 // Reads `parts` pieces of `chunkSize` bytes (the last one may be shorter) into partFiles[i], so the
 // progress can be seen from the files that appear while the script runs.
 QString readScript(uint64_t address, uint64_t byteCount, uint64_t chunkSize, const QStringList& partFiles);
+// The same, but only for the parts in `which` (indexes into `partFiles`): used to try again for
+// the parts a failed read did not finish. `sizes` holds the size of every part.
+QString readPartsScript(uint64_t address, uint64_t chunkSize, const QStringList& partFiles,
+                        const QList<qint64>& sizes, const QList<int>& which);
+// True when the Commander ended because the chip could not be read at some address.
+bool readFailedMidway(const QString& output);
 // How many parts readScript() needs.
 int partCount(uint64_t byteCount, uint64_t chunkSize);
 

@@ -130,6 +130,28 @@ private slots:
         QVERIFY(script.endsWith("exit\n"));
     }
 
+    void retryScriptReadsOnlyTheMissingParts() {
+        const QStringList parts{"C:/t/p0.bin", "C:/t/p1.bin", "C:/t/p2.bin"};
+        const QList<qint64> sizes{65536, 65536, 18928};
+        const QString script = readPartsScript(0x08000000, 65536, parts, sizes, {1, 2});
+        QVERIFY(!script.contains("p0.bin"));
+        QVERIFY(script.contains("savebin \"C:/t/p1.bin\", 0x08010000, 0x00010000\n"));
+        QVERIFY(script.contains("savebin \"C:/t/p2.bin\", 0x08020000, 0x000049f0\n"));
+        QVERIFY(script.endsWith("exit\n"));
+    }
+
+    void aReadThatStopsMidwayIsRecognised() {
+        // The end of a real run on an APM32F407 (the clone warning of the J-Link was open).
+        const QString out =
+            "Opening binary file for writing... [C:/t/part6.bin]\n"
+            "Reading 65536 bytes from addr 0x08060000 into file...O.K.\n"
+            "Opening binary file for writing... [C:/t/part7.bin]\n"
+            "Reading 65536 bytes from addr 0x08070000 into file...Could not read memory.\n"
+            "Script processing completed.\n";
+        QVERIFY(readFailedMidway(out));
+        QVERIFY(!readFailedMidway("Cannot connect to target.\n"));
+    }
+
     // --- reading the output -----------------------------------------------------------------
     void aSuccessfulRunIsOk() {
         // Real output of a connect that worked (shortened).
