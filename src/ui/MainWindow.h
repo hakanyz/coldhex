@@ -41,6 +41,7 @@ private slots:
     void onConnectTriggered();
     void onDisconnectTriggered();
     void onEraseTriggered();
+    void onSaveReadTriggered();
     void onUnlockTriggered();
     void onLockTriggered();
     void onProgramTriggered();

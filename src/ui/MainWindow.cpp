@@ -110,6 +110,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
+    connect(ui->actionSaveRead, &QAction::triggered, this, &MainWindow::onSaveReadTriggered);
     connect(ui->actionUnlock, &QAction::triggered, this, &MainWindow::onUnlockTriggered);
     connect(ui->actionLock, &QAction::triggered, this, &MainWindow::onLockTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
@@ -314,6 +315,7 @@ void MainWindow::updateUiState() {
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
     ui->actionRead->setEnabled(!busy);
     ui->actionErase->setEnabled(!busy);
+    ui->actionSaveRead->setEnabled(!busy && !m_targetReadData.isEmpty());
     ui->actionUnlock->setEnabled(!busy && m_canUnlock);
     ui->actionLock->setEnabled(!busy && m_canLock);
     ui->actionProgram->setEnabled(!busy);
@@ -837,10 +839,13 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
             m_targetReadBaseAddress = m_pendingReadBase;
             ui->radioSourceTarget->setChecked(true);
             updateMemoryViewer();
-            appendLog("SUCCESS", QString("Read %1 bytes into %2").arg(m_targetReadData.size()).arg(file));
+            appendLog("SUCCESS", QString("Read %1 bytes. They are shown in the memory view; press Save to keep them as a file.")
+                                     .arg(m_targetReadData.size()));
         } else if (success) {
-            appendLog("ERROR", "The read finished, but the output file could not be opened: " + file);
+            appendLog("ERROR", "The read finished, but its data could not be opened: " + file);
         }
+        QFile::remove(file);  // only a hand-over file between the engine and the window
+        updateUiState();
         return;
     }
 
@@ -853,6 +858,7 @@ void MainWindow::onEngineOperationFinished(bool success, const QString& message)
         if (success) {
             // The data read earlier no longer matches the chip, so drop it instead of showing it.
             m_targetReadData.clear();
+            updateUiState();
             updateMemoryViewer();
             appendLog("INFO", "Flash erased. Press Read to see the new contents (an erased flash reads 0xFF).");
         }
@@ -873,11 +879,11 @@ void MainWindow::onReadTargetTriggered() {
         return;
     }
 
-    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
-                                  .filePath(chip + "_flash.bin");
-    const QString file = QFileDialog::getSaveFileName(this, "Save Flash Contents As", suggested,
-                                                      "Binary (*.bin);;All Files (*.*)");
-    if (file.isEmpty()) return;
+    // The engines write the data to a file; read into a temporary one and show it. Keeping it
+    // is a separate step (Save), so Read does not ask where to put something the user only
+    // wants to look at.
+    const QString file = QDir::temp().filePath(
+        QString("coldhex_read_%1.bin").arg(QCoreApplication::applicationPid()));
 
     m_pendingReadFile = file;
     m_pendingReadBase = static_cast<uint32_t>(flash->start);
@@ -886,6 +892,27 @@ void MainWindow::onReadTargetTriggered() {
     appendLog("INFO", QString("Reading %1 KiB of flash from 0x%2...")
                           .arg(flash->size / 1024).arg(flash->start, 8, 16, QLatin1Char('0')));
     m_engine->readMemory(flash->start, flash->size, file);
+}
+
+// Keeps what the last Read showed: writes the bytes to a .bin file the user picks.
+void MainWindow::onSaveReadTriggered() {
+    if (m_targetReadData.isEmpty()) return;
+
+    const QString chip = m_chipSelector->chipText().trimmed();
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                  .filePath((chip.isEmpty() ? QString("target") : chip) + "_flash.bin");
+    const QString file = QFileDialog::getSaveFileName(this, "Save Flash Contents As", suggested,
+                                                      "Binary (*.bin);;All Files (*.*)");
+    if (file.isEmpty()) return;
+
+    QFile out(file);
+    if (!out.open(QIODevice::WriteOnly) || out.write(m_targetReadData) != m_targetReadData.size()) {
+        const QString msg = "Cannot write " + file;
+        appendLog("ERROR", msg);
+        QMessageBox::warning(this, "Save", msg);
+        return;
+    }
+    appendLog("SUCCESS", QString("Saved %1 bytes to %2").arg(m_targetReadData.size()).arg(file));
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {

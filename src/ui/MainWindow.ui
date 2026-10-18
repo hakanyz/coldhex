@@ -196,6 +196,7 @@
     <addaction name="actionConnect"/>
     <addaction name="actionDisconnect"/>
     <addaction name="actionRead"/>
+    <addaction name="actionSaveRead"/>
     <addaction name="actionErase"/>
     <addaction name="actionLock"/>
     <addaction name="actionUnlock"/>
@@ -255,6 +256,7 @@
    <addaction name="actionDisconnect"/>
    <addaction name="separator"/>
    <addaction name="actionRead"/>
+   <addaction name="actionSaveRead"/>
    <addaction name="actionErase"/>
    <addaction name="actionLock"/>
    <addaction name="actionUnlock"/>
@@ -612,13 +614,25 @@
      <normaloff>:/icons/toolbar/read.svg</normaloff>:/icons/toolbar/read.svg</iconset>
    </property>
    <property name="toolTip">
-    <string>Read the chip flash into a file and show it in the memory view</string>
+    <string>Read the chip flash and show it in the memory view (use Save to keep it as a file)</string>
    </property>
    <property name="text">
     <string>Read</string>
    </property>
    <property name="toolTip">
     <string>Read memory from target</string>
+   </property>
+  </action>
+  <action name="actionSaveRead">
+   <property name="icon">
+    <iconset resource="../../resources/coldhex.qrc">
+     <normaloff>:/icons/toolbar/save.svg</normaloff>:/icons/toolbar/save.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Save</string>
+   </property>
+   <property name="toolTip">
+    <string>Save the data shown after Read to a file</string>
    </property>
   </action>
   <action name="actionErase">

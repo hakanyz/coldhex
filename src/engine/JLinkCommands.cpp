@@ -119,6 +119,21 @@ QString readScript(uint64_t address, uint64_t byteCount, uint64_t chunkSize, con
     return script + "exit\n";
 }
 
+QString readPartsScript(uint64_t address, uint64_t chunkSize, const QStringList& partFiles,
+                        const QList<qint64>& sizes, const QList<int>& which) {
+    QString script;
+    for (int index : which) {
+        script += QString("savebin %1, %2, %3\n")
+                      .arg(quoted(partFiles.at(index)), hex(address + static_cast<uint64_t>(index) * chunkSize),
+                           hex(static_cast<uint64_t>(sizes.at(index))));
+    }
+    return script + "exit\n";
+}
+
+bool readFailedMidway(const QString& output) {
+    return output.contains("Could not read memory", Qt::CaseInsensitive);
+}
+
 Outcome analyze(int exitCode, const QString& output) {
     // Wording taken from real J-Link Commander output.
     static const char* const failures[] = {

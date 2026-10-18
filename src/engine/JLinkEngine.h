@@ -74,6 +74,8 @@ private:
     QString m_readOutput;
     QStringList m_readParts;
     QList<qint64> m_readPartSizes;
+    uint64_t m_readBase = 0;  // address of the first part
+    int m_readRetries = 0;    // how often the unfinished parts were tried again
 
     // The running verify: what the chip has to contain, compared after the pieces are read.
     QByteArray m_verifyImage;
