@@ -83,6 +83,11 @@ private:
     void setupUiCustomizations();
     void setupToolBarWidgets();
     void updateUiState();
+    // The speed list: fixed values, in kHz. speedKhz() is the chosen one; setSpeedKhz() picks
+    // the closest listed value that is not above the wanted one.
+    void fillSpeedList();
+    int speedKhz() const;
+    void setSpeedKhz(int khz);
     void appendLog(const QString& levelStr, const QString& message);
     void loadFileIntoSlot(int slotIndex, const QString& filePath);
     void updateMemoryViewer();
