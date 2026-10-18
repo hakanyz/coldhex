@@ -58,6 +58,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_memoryModel(new HexMemoryModel(this))
 {
     ui->setupUi(this);
+    fillSpeedList();
 
     // The Firmware Slots box takes the spare height of the settings panel, so its bottom edge
     // lines up with the bottom of the memory viewer next to it.
@@ -196,7 +197,7 @@ void MainWindow::restoreSettings() {
     m_chipSelector->restore(s.manufacturer, s.chip, s.customChipFiles);
     m_probeSelector->restore(s.probe);
     selectIfPresent(ui->comboInterface, s.interfaceName);
-    ui->spinSpeed->setValue(qBound(ui->spinSpeed->minimum(), s.speedKhz, ui->spinSpeed->maximum()));
+    setSpeedKhz(s.speedKhz);
 
     ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
     ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
@@ -220,7 +221,7 @@ void MainWindow::saveSettings() {
     s.chip = m_chipSelector->chipText();
     s.probe = m_probeSelector->label();
     s.interfaceName = ui->comboInterface->currentText();
-    s.speedKhz = ui->spinSpeed->value();
+    s.speedKhz = speedKhz();
     s.slot1Path = ui->editSlot1Path->text();
     s.slot2Path = ui->editSlot2Path->text();
     s.slot1Address = ui->editSlot1Address->text();
@@ -295,7 +296,7 @@ bool MainWindow::prepareEngine() {
     const QString descriptionFile = m_chipSelector->descriptionFileFor(chip);
     TargetSettings target;
     target.chipName = chip;
-    target.speedKhz = ui->spinSpeed->value();
+    target.speedKhz = speedKhz();
     target.probeId = m_probeSelector->selector();
     target.chipDescriptionPath = descriptionFile;
     target.protocol = (ui->comboInterface->currentText() == "JTAG") ? DebugProtocol::Jtag : DebugProtocol::Swd;
@@ -307,6 +308,35 @@ bool MainWindow::prepareEngine() {
 // Returns false (after telling the user) when the chip name is not known to probe-rs.
 void MainWindow::appendLog(const QString& levelStr, const QString& message) {
     m_console->append(levelStr, message);
+}
+
+namespace {
+// Clock speeds offered for the debug link, in kHz. A probe uses the closest speed it supports.
+const int kSpeedsKhz[] = {5, 10, 25, 50, 100, 250, 500, 1000, 2000, 4000, 6000, 8000, 10000,
+                          12000, 15000, 20000, 24000, 30000, 40000, 50000};
+constexpr int kDefaultSpeedKhz = 1000;
+}  // namespace
+
+void MainWindow::fillSpeedList() {
+    for (int khz : kSpeedsKhz) {
+        const QString text = khz >= 1000 ? QString("%1 MHz").arg(khz / 1000) : QString("%1 kHz").arg(khz);
+        ui->comboSpeed->addItem(text, khz);
+    }
+    setSpeedKhz(kDefaultSpeedKhz);
+}
+
+int MainWindow::speedKhz() const {
+    const QVariant value = ui->comboSpeed->currentData();
+    return value.isValid() ? value.toInt() : kDefaultSpeedKhz;
+}
+
+void MainWindow::setSpeedKhz(int khz) {
+    // The largest listed speed that is not above the wanted one (the smallest when all are above).
+    int best = 0;
+    for (int i = 0; i < ui->comboSpeed->count(); ++i) {
+        if (ui->comboSpeed->itemData(i).toInt() <= khz) best = i;
+    }
+    ui->comboSpeed->setCurrentIndex(best);
 }
 
 void MainWindow::updateUiState() {
@@ -331,7 +361,7 @@ void MainWindow::onConnectTriggered() {
     m_console->ensureVisible();
     if (!prepareEngine()) return;
     const QString chip = m_chipSelector->chipText();
-    const uint32_t speed = ui->spinSpeed->value();
+    const uint32_t speed = speedKhz();
     const QString probe = m_probeSelector->selector();
 
     m_manualConnect = true;
@@ -444,7 +474,7 @@ void MainWindow::startUnlock() {
 // telling the user why) when the run must not start.
 bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, FirmwareSlot& s2) {
     if (!m_chipSelector->resolve(cfg.chipName)) return false;
-    cfg.speedKhz = ui->spinSpeed->value();
+    cfg.speedKhz = speedKhz();
     cfg.probeId = m_probeSelector->selector();
     cfg.autoSpeedEnabled = true;
     cfg.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
@@ -713,10 +743,10 @@ void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
     updateUiState();
     if (success) {
         m_connectedProbe = m_probeSelector->selector();
-        ui->statusBar->showMessage(QString("Target answered via %1 at %2 kHz (chip: %3, as selected)").arg(ui->comboInterface->currentText()).arg(ui->spinSpeed->value()).arg(chipInfo));
+        ui->statusBar->showMessage(QString("Target answered via %1 at %2 kHz (chip: %3, as selected)").arg(ui->comboInterface->currentText()).arg(speedKhz()).arg(chipInfo));
         // The wires work and the target answered. The chip name is the user's selection: nothing here
         // checks that the chip behind the probe really is that one.
-        appendLog("INFO", QString("The target answered via %1 at %2 kHz. Chip: %3 (as selected, not verified).").arg(ui->comboInterface->currentText()).arg(ui->spinSpeed->value()).arg(chipInfo));
+        appendLog("INFO", QString("The target answered via %1 at %2 kHz. Chip: %3 (as selected, not verified).").arg(ui->comboInterface->currentText()).arg(speedKhz()).arg(chipInfo));
     } else {
         ui->statusBar->showMessage("Connection Failed");
         appendLog("ERROR", "Connection failed.");
@@ -796,7 +826,7 @@ void MainWindow::onStepChanged(const QString& stepDescription, int stepIndex, in
 
 void MainWindow::onAutoSpeedFallbackTriggered(uint32_t newSpeedKhz) {
     appendLog("WARN", QString("Auto-Speed fallback triggered -> %1 kHz. Retrying...").arg(newSpeedKhz));
-    ui->spinSpeed->setValue(static_cast<int>(newSpeedKhz));
+    setSpeedKhz(static_cast<int>(newSpeedKhz));
 }
 
 QString MainWindow::currentProbeRsPath() const {
