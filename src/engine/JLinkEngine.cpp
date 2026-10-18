@@ -13,6 +13,8 @@ namespace {
 // A read is done in pieces of this size, one Commander command each; a finished piece is a
 // file on disk, which is the only live progress the Commander gives.
 constexpr uint64_t kReadChunk = 64 * 1024;
+// How often the parts a failed read did not finish are read again.
+constexpr int kReadRetries = 2;
 
 // Lines of the Commander output worth showing in the console after a successful run.
 bool isInteresting(const QString& line) {
@@ -215,6 +217,8 @@ void JLinkEngine::verifyFile(const QString& filePath, uint32_t baseAddress) {
 
 // Starts a run that saves a memory area in pieces; the finished pieces show the progress.
 void JLinkEngine::startReadingParts(uint64_t address, uint64_t byteCount, State state, const QString& action) {
+    m_readBase = address;
+    m_readRetries = 0;
     const int parts = JLinkCommands::partCount(byteCount, kReadChunk);
     for (int i = 0; i < parts; ++i) {
         m_readParts << m_scratch.filePath(QString("part%1.bin").arg(i));
@@ -354,6 +358,29 @@ void JLinkEngine::onFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     if (exitStatus != QProcess::NormalExit && outcome.ok) {
         outcome.ok = false;
         outcome.error = "The J-Link Commander crashed.";
+    }
+    // A read can stop in the middle, for example when the SEGGER clone warning blocks the link for
+    // a while. The parts that are finished are kept; only the others are read again.
+    if (!outcome.ok && (done == State::Reading || done == State::Verifying) && m_readRetries < kReadRetries
+        && JLinkCommands::readFailedMidway(output)) {
+        QList<int> missing;
+        for (int i = 0; i < m_readParts.size(); ++i) {
+            if (QFileInfo(m_readParts.at(i)).size() != m_readPartSizes.at(i)) {
+                QFile::remove(m_readParts.at(i));
+                missing << i;
+            }
+        }
+        if (!missing.isEmpty() && missing.size() < m_readParts.size()) {
+            ++m_readRetries;
+            emit logMessage(QString("The read stopped at part %1 of %2 (the chip could not be read). Trying the "
+                                    "remaining %3 parts again (%4 of %5)...")
+                                .arg(missing.first() + 1).arg(m_readParts.size()).arg(missing.size())
+                                .arg(m_readRetries).arg(kReadRetries),
+                            EngineLogLevel::Warning);
+            run(JLinkCommands::readPartsScript(m_readBase, kReadChunk, m_readParts, m_readPartSizes, missing),
+                done, m_action);
+            return;
+        }
     }
     if (outcome.ok && done == State::Reading) {
         QString error;
