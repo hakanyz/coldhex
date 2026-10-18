@@ -41,6 +41,8 @@ private slots:
     void onConnectTriggered();
     void onDisconnectTriggered();
     void onEraseTriggered();
+    void onUnlockTriggered();
+    void onLockTriggered();
     void onProgramTriggered();
     void onVerifyTriggered();
     void onResetTargetTriggered();
@@ -64,6 +66,10 @@ private slots:
     // Engine and Coordinator Signals
     void onEngineLogMessage(const QString& message, EngineLogLevel level);
     void onEngineConnected(bool success, const QString& chipInfo);
+    void onProtectionDetected(int level);
+    void onCapabilitiesReady(const QString& chipName, bool canLock, bool canUnlock);
+    void askCapabilities();
+    void startUnlock();
     void onEngineDisconnected();
     void onProbesListed(const QStringList& selectors);
     void onProbeInspected(const QString& selector, const ProbeDetails& details, bool ok, const QString& error);
@@ -112,6 +118,10 @@ private:
 
 
     bool m_isOperationRunning = false;
+    // What Lock and Unlock can do for the selected chip; true until the helper has answered.
+    bool m_canLock = true;
+    bool m_canUnlock = true;
+    QTimer* m_capabilitiesTimer = nullptr;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
     bool m_manualConnect = false;  // the user pressed Connect (not a step of a sequence)
     QString m_connectedProbe;      // VID:PID[:serial] of the probe the connection was made with

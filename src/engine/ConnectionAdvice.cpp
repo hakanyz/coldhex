@@ -49,10 +49,10 @@ QString ConnectionAdvice::explain(const QString& out) {
                        "Lower the speed, and check the chip choice and the selected interface (SWD or JTAG)."});
     }
 
-    if (has(out, "read protection") || has(out, "readout protection") || has(out, "locked")) {
+    if (has(out, "read protection") || has(out, "readout protection") || has(out, "locked") || has(out, "erase_all")) {
         return advice("The chip may be read-protected.",
                       {"Debug access is blocked by the protection setting of the chip.",
-                       "Removing the protection erases the whole flash; use Erase (chip erase) if that is acceptable."});
+                       "Use Unlock to remove the protection; the chip erases its whole flash while it does so."});
     }
 
     if (has(out, "access is denied") || has(out, "permission denied") || has(out, "libusb")) {

@@ -23,6 +23,9 @@ public:
     bool isBusy() const override;
 
     void eraseTarget(bool fullErase = true) override;
+    void unlockTarget() override;
+    void lockTarget() override;
+    void requestCapabilities(const QString& chipName) override;
     void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) override;
     void verifyFile(const QString& filePath, uint32_t baseAddress) override;
     void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) override;

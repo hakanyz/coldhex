@@ -4,6 +4,8 @@
         <file alias="toolbar/connect.svg">icons/toolbar/connect.svg</file>
         <file alias="toolbar/disconnect.svg">icons/toolbar/disconnect.svg</file>
         <file alias="toolbar/erase.svg">icons/toolbar/erase.svg</file>
+        <file alias="toolbar/lock.svg">icons/toolbar/lock.svg</file>
+        <file alias="toolbar/unlock.svg">icons/toolbar/unlock.svg</file>
         <file alias="toolbar/open.svg">icons/toolbar/open.svg</file>
         <file alias="toolbar/program.svg">icons/toolbar/program.svg</file>
         <file alias="toolbar/read.svg">icons/toolbar/read.svg</file>
