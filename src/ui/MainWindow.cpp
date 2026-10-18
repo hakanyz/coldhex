@@ -93,6 +93,8 @@ MainWindow::MainWindow(QWidget *parent)
     // Engine Signals
     connect(m_engine, &IProgrammerEngine::logMessage, this, &MainWindow::onEngineLogMessage);
     connect(m_engine, &IProgrammerEngine::connected, this, &MainWindow::onEngineConnected);
+    connect(m_engine, &IProgrammerEngine::protectionDetected, this, &MainWindow::onProtectionDetected);
+    connect(m_engine, &IProgrammerEngine::capabilitiesReady, this, &MainWindow::onCapabilitiesReady);
     connect(m_engine, &IProgrammerEngine::disconnected, this, &MainWindow::onEngineDisconnected);
     connect(m_engine, &IProgrammerEngine::operationFinished, this, &MainWindow::onEngineOperationFinished);
 
@@ -108,6 +110,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionRead, &QAction::triggered, this, &MainWindow::onReadTargetTriggered);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAboutTriggered);
     connect(ui->actionErase, &QAction::triggered, this, &MainWindow::onEraseTriggered);
+    connect(ui->actionUnlock, &QAction::triggered, this, &MainWindow::onUnlockTriggered);
+    connect(ui->actionLock, &QAction::triggered, this, &MainWindow::onLockTriggered);
     connect(ui->actionProgram, &QAction::triggered, this, &MainWindow::onProgramTriggered);
     connect(ui->actionVerify, &QAction::triggered, this, &MainWindow::onVerifyTriggered);
     connect(ui->actionResetTarget, &QAction::triggered, this, &MainWindow::onResetTargetTriggered);
@@ -139,6 +143,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->comboModel, &QComboBox::currentTextChanged, [this](const QString& model) {
         const QString name = model.trimmed();
         ui->lblMemoryMapTitle->setText(name.isEmpty() ? QString("Memory Map") : QString("Memory Map (%1) - Flash").arg(name));
+    });
+
+    // Lock and Unlock exist only for some chip families: ask the helper after the chip stops changing.
+    m_capabilitiesTimer = new QTimer(this);
+    m_capabilitiesTimer->setSingleShot(true);
+    m_capabilitiesTimer->setInterval(300);
+    connect(m_capabilitiesTimer, &QTimer::timeout, this, &MainWindow::askCapabilities);
+    connect(ui->comboModel, &QComboBox::currentTextChanged, this, [this]() {
+        m_canLock = m_canUnlock = true;  // unknown until answered
+        updateUiState();
+        m_capabilitiesTimer->start();
     });
 
     restoreSettings();
@@ -299,6 +314,8 @@ void MainWindow::updateUiState() {
     ui->actionDisconnect->setEnabled(!busy && m_engine->isConnected());
     ui->actionRead->setEnabled(!busy);
     ui->actionErase->setEnabled(!busy);
+    ui->actionUnlock->setEnabled(!busy && m_canUnlock);
+    ui->actionLock->setEnabled(!busy && m_canLock);
     ui->actionProgram->setEnabled(!busy);
     ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
@@ -339,6 +356,86 @@ void MainWindow::onEraseTriggered() {
     m_lastCommandWasErase = true;
     updateUiState();
     m_engine->eraseTarget(true);
+}
+
+void MainWindow::onLockTriggered() {
+    m_console->ensureVisible();
+    if (QMessageBox::warning(this, "Enable Read Protection",
+            "This sets the read-out protection to level 1: the flash of the chip can no longer be "
+            "read through the debug port.\n\n"
+            "Level 1 can be removed again with Unlock, but that ERASES THE WHOLE FLASH.\n\nContinue?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+    if (!prepareEngine()) return;
+
+    m_isOperationRunning = true;
+    updateUiState();
+    m_engine->lockTarget();
+}
+
+void MainWindow::askCapabilities() {
+    const QString chip = m_chipSelector->chipText().trimmed();
+    if (!chip.isEmpty()) m_engine->requestCapabilities(chip);
+}
+
+// Greys out Lock and Unlock for chips without a recipe and says why in the tooltip.
+void MainWindow::onCapabilitiesReady(const QString& chipName, bool canLock, bool canUnlock) {
+    if (chipName != m_chipSelector->chipText().trimmed()) return;  // an older question
+    m_canLock = canLock;
+    m_canUnlock = canUnlock;
+
+    const QString none = tr("Not available for %1: no verified method for this chip family yet.").arg(chipName);
+    ui->actionLock->setToolTip(canLock ? tr("Enable read-out protection level 1 (the flash can no longer be read)")
+                                       : none);
+    ui->actionUnlock->setToolTip(canUnlock ? tr("Remove read-out protection level 1; the flash is erased") : none);
+    updateUiState();
+}
+
+// The chip answered, but a read-protected one answers too: say what the protection is. For
+// level 1 offer the way out right away, like ST-LINK Utility does.
+void MainWindow::onProtectionDetected(int level) {
+    if (level == 0) {
+        appendLog("INFO", "Read protection: off.");
+        return;
+    }
+    if (level >= 2) {
+        appendLog("ERROR", "Read protection: level 2. This is permanent: the chip cannot be read, "
+                           "programmed or unlocked any more.");
+        return;
+    }
+    appendLog("WARN", "Read protection: level 1. The flash cannot be read or programmed until the "
+                      "protection is removed (this erases the whole flash).");
+    if (m_isOperationRunning || m_engine->isBusy()) return;
+    if (QMessageBox::question(this, "Chip is read-protected",
+            "The chip has read-out protection level 1: its flash cannot be read or programmed.\n\n"
+            "Remove the protection now? The chip ERASES ITS WHOLE FLASH while it does this.",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes) {
+        startUnlock();
+    }
+}
+
+void MainWindow::onUnlockTriggered() {
+    m_console->ensureVisible();
+    if (QMessageBox::warning(this, "Remove Read Protection",
+            "This removes the read-out protection (level 1) of the chip.\n\n"
+            "The chip ERASES ITS WHOLE FLASH while it does this; the firmware on it cannot be "
+            "recovered. A chip with protection level 2 cannot be unlocked.\n\nContinue?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
+    startUnlock();
+}
+
+// Starts the unlock; the user has already confirmed it.
+void MainWindow::startUnlock() {
+    m_console->ensureVisible();
+    if (!prepareEngine()) return;
+
+    m_isOperationRunning = true;
+    m_lastCommandWasErase = true;  // the flash is empty afterwards, like after an erase
+    updateUiState();
+    m_engine->unlockTarget();
 }
 
 // Collects target settings and both slots from the UI and checks them. Returns false (after

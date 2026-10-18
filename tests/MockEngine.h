@@ -31,6 +31,9 @@ public:
     bool isBusy() const override { return m_busy; }
 
     void eraseTarget(bool) override { commands << "erase"; m_busy = true; }
+    void unlockTarget() override { commands << "unlock"; m_busy = true; }
+    void lockTarget() override { commands << "lock"; m_busy = true; }
+    void requestCapabilities(const QString&) override {}
     void programFile(const QString& filePath, uint32_t baseAddress, bool verify) override {
         commands << QString("program:%1@0x%2%3").arg(filePath).arg(baseAddress, 0, 16).arg(verify ? ":verify" : "");
         m_busy = true;

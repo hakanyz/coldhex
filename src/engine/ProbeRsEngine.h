@@ -9,6 +9,8 @@ enum class EngineState {
     Idle,
     Connecting,
     Erasing,
+    Unlocking,
+    Locking,
     Programming,
     Verifying,
     Reading,
@@ -30,6 +32,9 @@ public:
     bool isBusy() const override;
 
     void eraseTarget(bool fullErase = true) override;
+    void unlockTarget() override;
+    void lockTarget() override;
+    void requestCapabilities(const QString& chipName) override;
     void programFile(const QString& filePath, uint32_t baseAddress, bool verify = true) override;
     void verifyFile(const QString& filePath, uint32_t baseAddress) override;
     void readMemory(uint64_t address, uint64_t byteCount, const QString& outputFile) override;
@@ -82,6 +87,8 @@ private slots:
     void onChipListErrorOccurred(QProcess::ProcessError error);
     void onProbeListFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProbeListErrorOccurred(QProcess::ProcessError error);
+    void onProtectionFinished();
+    void onCapabilitiesFinished();
 
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription,
@@ -96,6 +103,10 @@ private:
     QProcess* m_process = nullptr;
     QProcess* m_chipListProcess = nullptr;
     QProcess* m_probeListProcess = nullptr;
+    QProcess* m_protectionProcess = nullptr;  // reads the protection level once after a connect
+    QProcess* m_capabilitiesProcess = nullptr;
+    QString m_capabilitiesChip;
+    QByteArray m_protectionOutput;
     EngineState m_state = EngineState::Idle;
     bool m_connected = false;
     bool m_cancelRequested = false;

@@ -7,12 +7,18 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QStandardPaths>
+#include <QTimer>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 
 ProbeRsEngine::ProbeRsEngine(QObject* parent)
     : IProgrammerEngine(parent),
       m_process(new QProcess(this)),
       m_chipListProcess(new QProcess(this)),
       m_probeListProcess(new QProcess(this)),
+      m_protectionProcess(new QProcess(this)),
+      m_capabilitiesProcess(new QProcess(this)),
       m_progressRegex(QStringLiteral(R"((\d+)\s*%)"))
 {
     connect(m_process, &QProcess::readyReadStandardOutput, this, &ProbeRsEngine::onProcessReadyReadStdOut);
@@ -27,6 +33,10 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
     connect(m_probeListProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProbeRsEngine::onProbeListFinished);
     connect(m_probeListProcess, &QProcess::errorOccurred, this, &ProbeRsEngine::onProbeListErrorOccurred);
+    connect(m_protectionProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this]() { onProtectionFinished(); });
+    connect(m_capabilitiesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this]() { onCapabilitiesFinished(); });
 
     // Prefer a probe-rs shipped with ColdHex, then PATH, then the installer's default folder.
     const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
@@ -212,6 +222,33 @@ void ProbeRsEngine::eraseTarget(bool fullErase) {
     }
 
     runCommand(QStringList{"erase"} + targetArgs(), EngineState::Erasing, "Erasing target chip (Chip Erase)...");
+}
+
+void ProbeRsEngine::unlockTarget() {
+    if (isBusy()) return;
+
+    // Only the helper knows how to unlock: the probe-rs command line has no such command.
+    if (m_helperPath.isEmpty()) {
+        emit logMessage("Unlock needs the coldhex-flash helper, which was not found.", EngineLogLevel::Error);
+        QTimer::singleShot(0, this, [this]() { emit operationFinished(false, "Helper missing."); });
+        return;
+    }
+    // Connect under reset follows the user's setting: a board without a wired NRST pin times
+    // out with it, while a chip that disables its debug pins needs it.
+    runCommand(QStringList{"unlock"} + helperTargetArgsFor(m_target), EngineState::Unlocking,
+               "Removing read-out protection (the flash will be erased)...", true);
+}
+
+void ProbeRsEngine::lockTarget() {
+    if (isBusy()) return;
+
+    if (m_helperPath.isEmpty()) {
+        emit logMessage("Lock needs the coldhex-flash helper, which was not found.", EngineLogLevel::Error);
+        QTimer::singleShot(0, this, [this]() { emit operationFinished(false, "Helper missing."); });
+        return;
+    }
+    runCommand(QStringList{"lock"} + helperTargetArgsFor(m_target), EngineState::Locking,
+               "Setting read-out protection level 1...", true);
 }
 
 void ProbeRsEngine::programFile(const QString& filePath, uint32_t baseAddress, bool verify) {
@@ -472,6 +509,12 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     if (completedState == EngineState::Connecting) {
         m_connected = success;
         emit connected(success, success ? m_target.chipName : advice);
+        // Connecting only shows that the wires work; a locked chip answers too. Ask the chip
+        // for its protection level (in the background, only when the helper is there).
+        if (success && !m_helperPath.isEmpty() && m_protectionProcess->state() == QProcess::NotRunning) {
+            m_protectionOutput.clear();
+            m_protectionProcess->start(m_helperPath, QStringList{"protection"} + helperTargetArgsFor(m_target));
+        }
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)
@@ -480,6 +523,40 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     emit progressChanged(success ? 100 : 0, msg);
     emit logMessage(msg, success ? EngineLogLevel::Success : EngineLogLevel::Error);
     emit operationFinished(success, msg);
+}
+
+void ProbeRsEngine::requestCapabilities(const QString& chipName) {
+    if (m_helperPath.isEmpty() || chipName.isEmpty()) return;  // no answer: the buttons stay on
+
+    // A newer question replaces an older one that is still running.
+    if (m_capabilitiesProcess->state() != QProcess::NotRunning) {
+        m_capabilitiesProcess->kill();
+        m_capabilitiesProcess->waitForFinished(500);
+    }
+    m_capabilitiesChip = chipName;
+    m_capabilitiesProcess->start(m_helperPath, {"capabilities", "--chip", chipName});
+}
+
+void ProbeRsEngine::onCapabilitiesFinished() {
+    // {"event":"capabilities","status":true,"lock":true,"unlock":true}
+    const QByteArray output = m_capabilitiesProcess->readAllStandardOutput();
+    for (const QByteArray& line : output.split('\n')) {
+        const QJsonObject object = QJsonDocument::fromJson(line.trimmed()).object();
+        if (object.value("event").toString() != "capabilities") continue;
+        emit capabilitiesReady(m_capabilitiesChip, object.value("lock").toBool(), object.value("unlock").toBool());
+    }
+}
+
+void ProbeRsEngine::onProtectionFinished() {
+    // One JSON line: {"event":"protection","level":1}. Nothing to say when it failed or the
+    // level is unknown (null): the connection itself was already reported.
+    const QByteArray output = m_protectionProcess->readAllStandardOutput();
+    for (const QByteArray& line : output.split('\n')) {
+        const QJsonObject object = QJsonDocument::fromJson(line.trimmed()).object();
+        if (object.value("event").toString() != "protection") continue;
+        const QJsonValue level = object.value("level");
+        if (level.isDouble()) emit protectionDetected(level.toInt());
+    }
 }
 
 void ProbeRsEngine::onProcessErrorOccurred(QProcess::ProcessError error) {

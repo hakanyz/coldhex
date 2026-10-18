@@ -8,6 +8,8 @@ RoutingEngine::RoutingEngine(IProgrammerEngine* probeRs, IProgrammerEngine* jlin
     for (IProgrammerEngine* engine : {m_probeRs, m_jlink}) {
         if (!engine) continue;
         connect(engine, &IProgrammerEngine::connected, this, &IProgrammerEngine::connected);
+        connect(engine, &IProgrammerEngine::protectionDetected, this, &IProgrammerEngine::protectionDetected);
+        connect(engine, &IProgrammerEngine::capabilitiesReady, this, &IProgrammerEngine::capabilitiesReady);
         connect(engine, &IProgrammerEngine::disconnected, this, &IProgrammerEngine::disconnected);
         connect(engine, &IProgrammerEngine::operationStarted, this, &IProgrammerEngine::operationStarted);
         connect(engine, &IProgrammerEngine::progressChanged, this, &IProgrammerEngine::progressChanged);
@@ -46,6 +48,9 @@ bool RoutingEngine::isConnected() const { return m_active->isConnected(); }
 bool RoutingEngine::isBusy() const { return m_active->isBusy(); }
 
 void RoutingEngine::eraseTarget(bool fullErase) { m_active->eraseTarget(fullErase); }
+void RoutingEngine::unlockTarget() { m_active->unlockTarget(); }
+void RoutingEngine::lockTarget() { m_active->lockTarget(); }
+void RoutingEngine::requestCapabilities(const QString& chipName) { m_probeRs->requestCapabilities(chipName); }
 
 void RoutingEngine::programFile(const QString& filePath, uint32_t baseAddress, bool verify) {
     m_active->programFile(filePath, baseAddress, verify);
