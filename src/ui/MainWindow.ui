@@ -366,21 +366,14 @@
         <item row="2" column="0">
          <widget class="QLabel" name="lblSpeed">
           <property name="text">
-           <string>Speed (kHz)</string>
+           <string>Speed</string>
           </property>
          </widget>
         </item>
         <item row="2" column="1">
-         <widget class="QSpinBox" name="spinSpeed">
-          <property name="minimum">
-           <number>100</number></property>
-          <property name="maximum">
-           <number>15000</number></property>
-          <property name="singleStep">
-           <number>500</number>
-          </property>
-          <property name="value">
-           <number>1000</number>
+         <widget class="QComboBox" name="comboSpeed">
+          <property name="toolTip">
+           <string>Clock of the debug link. The probe uses the closest speed it supports (an ST-Link V2 reaches at most 4 MHz). Lower it when the connection is unstable.</string>
           </property>
          </widget>
         </item>
