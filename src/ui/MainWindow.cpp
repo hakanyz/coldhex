@@ -139,6 +139,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Data Source Radios
     connect(ui->radioSourceFile1, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
     connect(ui->radioSourceFile2, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
+    connect(ui->radioSourceBoth, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
     connect(ui->radioSourceTarget, &QRadioButton::toggled, this, &MainWindow::onDataSourceChanged);
 
     // Model selection updates memory map title
@@ -199,8 +200,6 @@ void MainWindow::restoreSettings() {
     selectIfPresent(ui->comboInterface, s.interfaceName);
     setSpeedKhz(s.speedKhz);
 
-    ui->checkSlot1Enabled->setChecked(s.slot1Enabled);
-    ui->checkSlot2Enabled->setChecked(s.slot2Enabled);
     ui->checkEraseBeforeFlash->setChecked(s.eraseBeforeFlash);
     ui->checkVerifyAfterFlash->setChecked(s.verifyAfterFlash);
     ui->checkResetAfterFlash->setChecked(s.resetAfterFlash);
@@ -227,8 +226,6 @@ void MainWindow::saveSettings() {
     s.slot1Address = ui->editSlot1Address->text();
     s.slot2Address = ui->editSlot2Address->text();
     s.customChipFiles = m_chipSelector->customChipFiles();
-    s.slot1Enabled = ui->checkSlot1Enabled->isChecked();
-    s.slot2Enabled = ui->checkSlot2Enabled->isChecked();
     s.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
     s.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
     s.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
@@ -481,6 +478,13 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
     cfg.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
     cfg.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
 
+    if (ui->radioSourceTarget->isChecked()) {
+        const QString msg = "Choose File 1, File 2 or File 1 + File 2 under Data Source first. Read from Target is not a firmware file.";
+        appendLog("ERROR", msg);
+        QMessageBox::warning(this, "No Firmware Selected", msg);
+        return false;
+    }
+
     AddressRange range1;
     AddressRange range2;
     if (!buildSlot(1, s1, range1) || !buildSlot(2, s2, range2)) {
@@ -488,8 +492,9 @@ bool MainWindow::prepareFirmwareRun(TargetConfig& cfg, FirmwareSlot& s1, Firmwar
     }
 
     if (s1.enabled && s2.enabled && SlotValidator::overlaps(range1, range2)) {
-        const QString msg = QString("Slot 1 (0x%1 - 0x%2) and Slot 2 (0x%3 - 0x%4) overlap, so both cannot be on the target. "
-                                    "Flashing would overwrite the bootloader.")
+        const QString msg = QString("File 1 (0x%1 - 0x%2) and File 2 (0x%3 - 0x%4) use the same flash area, so they cannot both be written. "
+                                    "If they are for different boards, pick only one of them under Data Source. "
+                                    "Writing both would overwrite the first one.")
                                 .arg(range1.start, 8, 16, QLatin1Char('0'))
                                 .arg(uint64_t(range1.start) + range1.size - 1, 8, 16, QLatin1Char('0'))
                                 .arg(range2.start, 8, 16, QLatin1Char('0'))
@@ -568,9 +573,9 @@ bool MainWindow::slotAddress(int slotIndex, uint32_t& address) const {
 bool MainWindow::buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range) {
     const bool first = (slotIndex == 1);
     const QString path = (first ? ui->editSlot1Path : ui->editSlot2Path)->text().trimmed();
-    const bool checked = (first ? ui->checkSlot1Enabled : ui->checkSlot2Enabled)->isChecked();
+    const bool checked = ui->radioSourceBoth->isChecked() || (first ? ui->radioSourceFile1 : ui->radioSourceFile2)->isChecked();
 
-    slot.label = first ? "Slot 1 (Bootloader)" : "Slot 2 (Application)";
+    slot.label = first ? "File 1" : "File 2";
     slot.filePath = path;
     slot.enabled = checked && !path.isEmpty();
     if (!slot.enabled) return true;
@@ -622,14 +627,14 @@ void MainWindow::onOpenHexTriggered() {
 }
 
 void MainWindow::onOpenSlot1Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 1 (Bootloader) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select File 1", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot1Path->setText(file);
     }
 }
 
 void MainWindow::onOpenSlot2Clicked() {
-    QString file = QFileDialog::getOpenFileName(this, "Select Slot 2 (Application) File", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
+    QString file = QFileDialog::getOpenFileName(this, "Select File 2", "", "Firmware Files (*.hex *.bin *.elf *.axf);;All Files (*.*)");
     if (!file.isEmpty()) {
         ui->editSlot2Path->setText(file);
     }
@@ -695,7 +700,7 @@ void MainWindow::onDataSourceChanged() {
 }
 
 void MainWindow::updateMemoryViewer() {
-    if (ui->radioSourceFile1->isChecked()) {
+    if (ui->radioSourceFile1->isChecked() || ui->radioSourceBoth->isChecked()) {
         if (m_slot1ParseResult.success && !m_slot1ParseResult.data.isEmpty()) {
             m_memoryModel->setMemoryData(m_slot1ParseResult.baseAddress, m_slot1ParseResult.data);
             ui->lblHexFileInfo->setText(QString("HEX File Loaded: %1 (%2 KB)")
@@ -984,9 +989,13 @@ void MainWindow::dropEvent(QDropEvent* event) {
     for (const auto& a : assignments) {
         const bool toSlot1 = (a.slot == 1);
         (toSlot1 ? ui->editSlot1Path : ui->editSlot2Path)->setText(a.file);
-        (toSlot1 ? ui->checkSlot1Enabled : ui->checkSlot2Enabled)->setChecked(true);
         appendLog("INFO", QString("%1 -> %2").arg(QFileInfo(a.file).fileName(),
-                                                   toSlot1 ? "Slot 1 (Bootloader)" : "Slot 2 (Application)"));
+                                                   toSlot1 ? "File 1" : "File 2"));
+    }
+    if (assignments.size() > 1) {
+        ui->radioSourceBoth->setChecked(true);
+    } else {
+        (assignments.first().slot == 1 ? ui->radioSourceFile1 : ui->radioSourceFile2)->setChecked(true);
     }
     if (ignoredExtra) appendLog("WARNING", "Only the first two dropped files were used.");
     event->acceptProposedAction();

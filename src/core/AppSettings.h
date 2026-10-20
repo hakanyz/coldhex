@@ -22,8 +22,6 @@ struct UiSettings {
     QString slot1Address;
     QString slot2Address;
     QStringList customChipFiles;
-    bool slot1Enabled = true;
-    bool slot2Enabled = true;
 
     bool eraseBeforeFlash = true;
     bool verifyAfterFlash = true;

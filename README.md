@@ -70,7 +70,7 @@ CMSIS-DAP probes did not show this.
 1. Connect the probe and the target board.
 2. Pick the **Manufacturer** and **Model** (or type part of the chip name).
 3. Choose **Interface** and **Speed**, then press **Connect**.
-4. Select your firmware for **Slot 1** (bootloader, optional) and/or **Slot 2** (application). For
+4. Select your firmware in **File 1** and/or **File 2** (for example a bootloader and an application, or files for two different boards). Under **Data Source** choose which one is programmed: **File 1**, **File 2**, or **File 1 + File 2** for both. For
    `.bin` files enter the start address; HEX and ELF files carry their own addresses.
 5. Press **Program**.
 
