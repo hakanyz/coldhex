@@ -23,8 +23,6 @@ UiSettings AppSettings::load(QSettings& settings) {
     v.slot1Address = settings.value("firmware/slot1Address").toString();
     v.slot2Address = settings.value("firmware/slot2Address").toString();
     v.customChipFiles = settings.value("target/customChipFiles").toStringList();
-    v.slot1Enabled = settings.value("firmware/slot1Enabled", v.slot1Enabled).toBool();
-    v.slot2Enabled = settings.value("firmware/slot2Enabled", v.slot2Enabled).toBool();
 
     v.eraseBeforeFlash = settings.value("options/eraseBeforeFlash", v.eraseBeforeFlash).toBool();
     v.verifyAfterFlash = settings.value("options/verifyAfterFlash", v.verifyAfterFlash).toBool();
@@ -50,8 +48,6 @@ void AppSettings::save(QSettings& settings, const UiSettings& v) {
     settings.setValue("firmware/slot1Address", v.slot1Address);
     settings.setValue("firmware/slot2Address", v.slot2Address);
     settings.setValue("target/customChipFiles", v.customChipFiles);
-    settings.setValue("firmware/slot1Enabled", v.slot1Enabled);
-    settings.setValue("firmware/slot2Enabled", v.slot2Enabled);
 
     settings.setValue("options/eraseBeforeFlash", v.eraseBeforeFlash);
     settings.setValue("options/verifyAfterFlash", v.verifyAfterFlash);
