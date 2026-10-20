@@ -76,17 +76,27 @@
             <item>
              <widget class="QRadioButton" name="radioSourceFile1">
               <property name="text">
-               <string>Load from File 1</string>
+               <string>File 1</string>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QRadioButton" name="radioSourceFile2">
               <property name="text">
-               <string>Load from File 2</string>
+               <string>File 2</string>
               </property>
               <property name="checked">
                <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="radioSourceBoth">
+              <property name="text">
+               <string>File 1 + File 2</string>
+              </property>
+              <property name="toolTip">
+               <string>Program and Verify write both files (e.g. bootloader + application). The memory view shows File 1.</string>
               </property>
              </widget>
             </item>
@@ -432,13 +442,13 @@
      <item>
       <widget class="QGroupBox" name="groupFirmwareSlots">
        <property name="title">
-        <string>Firmware Slots</string>
+        <string>Firmware Files</string>
        </property>
        <layout class="QVBoxLayout" name="layoutSlots">
         <item>
          <widget class="QLabel" name="lblSlot1Title">
           <property name="text">
-           <string>Slot 1 (Bootloader)</string>
+           <string>File 1</string>
           </property>
          </widget>
         </item>
@@ -457,7 +467,7 @@
           <item>
            <widget class="QLineEdit" name="editSlot1Path">
             <property name="placeholderText">
-             <string>Select bootloader file...</string>
+             <string>Select firmware file...</string>
             </property>
            </widget>
           </item>
@@ -474,22 +484,12 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QCheckBox" name="checkSlot1Enabled">
-            <property name="text">
-             <string/>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
          </layout>
         </item>
         <item>
          <widget class="QLabel" name="lblSlot2Title">
           <property name="text">
-           <string>Slot 2 (Application)</string>
+           <string>File 2</string>
           </property>
          </widget>
         </item>
@@ -508,7 +508,7 @@
           <item>
            <widget class="QLineEdit" name="editSlot2Path">
             <property name="placeholderText">
-             <string>Select application file...</string>
+             <string>Select firmware file...</string>
             </property>
            </widget>
           </item>
@@ -522,16 +522,6 @@
             </property>
             <property name="maximumWidth">
              <number>90</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QCheckBox" name="checkSlot2Enabled">
-            <property name="text">
-             <string/>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
             </property>
            </widget>
           </item>

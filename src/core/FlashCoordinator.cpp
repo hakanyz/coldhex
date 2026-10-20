@@ -47,7 +47,7 @@ bool FlashCoordinator::checkRequest() {
     }
 
     if (!m_slot1.enabled && !m_slot2.enabled) {
-        emit sequenceFinished(false, "At least one firmware slot (Bootloader or Application) must be enabled.");
+        emit sequenceFinished(false, "Choose at least one firmware file.");
         return false;
     }
     return true;
@@ -145,22 +145,22 @@ void FlashCoordinator::executeNextStep() {
         break;
 
     case CoordinatorStep::FlashingSlot1:
-        emit stepChanged(QString("Flashing Slot 1: %1").arg(m_slot1.label), current, total);
+        emit stepChanged(QString("Flashing %1").arg(m_slot1.label), current, total);
         m_engine->programFile(m_slot1.filePath, m_slot1.startAddress, m_config.verifyAfterFlash);
         break;
 
     case CoordinatorStep::FlashingSlot2:
-        emit stepChanged(QString("Flashing Slot 2: %1").arg(m_slot2.label), current, total);
+        emit stepChanged(QString("Flashing %1").arg(m_slot2.label), current, total);
         m_engine->programFile(m_slot2.filePath, m_slot2.startAddress, m_config.verifyAfterFlash);
         break;
 
     case CoordinatorStep::VerifyingSlot1:
-        emit stepChanged(QString("Verifying Slot 1: %1").arg(m_slot1.label), current, total);
+        emit stepChanged(QString("Verifying %1").arg(m_slot1.label), current, total);
         m_engine->verifyFile(m_slot1.filePath, m_slot1.startAddress);
         break;
 
     case CoordinatorStep::VerifyingSlot2:
-        emit stepChanged(QString("Verifying Slot 2: %1").arg(m_slot2.label), current, total);
+        emit stepChanged(QString("Verifying %1").arg(m_slot2.label), current, total);
         m_engine->verifyFile(m_slot2.filePath, m_slot2.startAddress);
         break;
 

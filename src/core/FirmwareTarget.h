@@ -12,7 +12,7 @@ enum class FileFormat {
 
 struct FirmwareSlot {
     bool enabled = false;
-    QString label;              // e.g. "Slot 1: Bootloader"
+    QString label;              // e.g. "File 1"
     QString filePath;
     uint32_t startAddress = 0x08000000;
     FileFormat format = FileFormat::AutoDetect;
