@@ -4,6 +4,7 @@
 #include "core/AppSettings.h"
 #include "core/ProfileStore.h"
 #include "ProfileCombo.h"
+#include "Theme.h"
 #include <QGroupBox>
 #include <QRadioButton>
 #include <QCheckBox>
@@ -92,6 +93,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupUiCustomizations();
     setupProfileBar();
+    setupFileBadges();
     setupToolBarWidgets();
 
     m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
@@ -359,6 +361,48 @@ void MainWindow::updateUiState() {
     ui->actionResetTarget->setEnabled(!busy);
     ui->actionCancel->setEnabled(busy);
     if (m_comboProfile) m_comboProfile->setEnabled(!busy);
+}
+
+void MainWindow::setupFileBadges() {
+    m_lblUpdated[0] = addUpdatedBadge(ui->lblSlot1Title);
+    m_lblUpdated[1] = addUpdatedBadge(ui->lblSlot2Title);
+    for (int i = 0; i < 2; ++i) {
+        m_fileWatch[i] = new FileWatcher(this);
+        connect(m_fileWatch[i], &FileWatcher::changed, this, [this, i]() { onSlotFileChanged(i + 1); });
+    }
+}
+
+// Puts a small "updated" note next to a slot title. It stays hidden until the file changes.
+QLabel* MainWindow::addUpdatedBadge(QLabel* title) {
+    auto* badge = new QLabel("Updated", this);
+    badge->setStyleSheet(QString("color: %1; font-weight: bold;").arg(Theme::hex(Theme::Color::logSuccess)));
+    badge->setToolTip("The file was rebuilt on disk. The memory view shows the new content. The note goes away after Program.");
+    badge->hide();
+
+    const int index = ui->layoutSlots->indexOf(title);
+    ui->layoutSlots->removeWidget(title);
+    auto* row = new QHBoxLayout;
+    row->addWidget(title);
+    row->addWidget(badge);
+    row->addStretch();
+    ui->layoutSlots->insertLayout(index, row);
+    return badge;
+}
+
+// A different file is not an update of the old one, so the note goes away with it.
+void MainWindow::watchSlotFile(int slotIndex, const QString& path) {
+    if (!m_fileWatch[slotIndex - 1]) return;
+    if (m_fileWatch[slotIndex - 1]->path() == path) return;
+    m_lblUpdated[slotIndex - 1]->hide();
+    m_fileWatch[slotIndex - 1]->setFile(path);
+}
+
+void MainWindow::onSlotFileChanged(int slotIndex) {
+    const QString path = (slotIndex == 1 ? ui->editSlot1Path : ui->editSlot2Path)->text();
+    ++m_changeCount[slotIndex - 1];
+    m_lblUpdated[slotIndex - 1]->show();
+    appendLog("INFO", QString("File '%1' changed on disk, reloaded.").arg(QFileInfo(path).fileName()));
+    loadFileIntoSlot(slotIndex, path);
 }
 
 void MainWindow::updateHexFileCombo() {
@@ -764,6 +808,13 @@ void MainWindow::onProgramTriggered() {
     m_coordinator->setSlot1(s1);
     m_coordinator->setSlot2(s2);
 
+    // Remember what this run writes: once it succeeds those files are no longer "updated".
+    m_programRunning = true;
+    m_programmedSlot[0] = s1.enabled;
+    m_programmedSlot[1] = s2.enabled;
+    m_changeCountAtProgram[0] = m_changeCount[0];
+    m_changeCountAtProgram[1] = m_changeCount[1];
+
     m_coordinator->startFlashSequence();
 }
 
@@ -867,6 +918,7 @@ void MainWindow::onSlot2PathChanged(const QString& path) {
 }
 
 void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
+    watchSlotFile(slotIndex, path);
     if (path.isEmpty()) {
         (slotIndex == 1 ? m_slot1ParseResult : m_slot2ParseResult) = HexParseResult();
         updateHexFileCombo();
@@ -1033,6 +1085,13 @@ void MainWindow::onSequenceStarted() {
 }
 
 void MainWindow::onSequenceFinished(bool success, const QString& message) {
+    if (m_programRunning && success) {
+        for (int i = 0; i < 2; ++i) {
+            // A file that changed again while it was being written stays marked.
+            if (m_programmedSlot[i] && m_changeCount[i] == m_changeCountAtProgram[i]) m_lblUpdated[i]->hide();
+        }
+    }
+    m_programRunning = false;
     m_sequenceRunning = false;
     m_isOperationRunning = false;
     updateUiState();
