@@ -7,7 +7,7 @@ A desktop tool to flash and manage ARM Cortex-M microcontrollers over **ST-Link*
 **CMSIS-DAP** probes. It is vendor independent: STM32, GD32, Geehy APM32, TI, NXP, Nordic and
 every other chip supported by [probe-rs](https://probe.rs), in one window.
 
-![ColdHex main window](docs/screenshot.png)
+![ColdHex: switching profiles, the memory view and the Updated note](docs/demo.gif)
 
 > **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing, programming
 > and the progress display were tried on real hardware: ST-Link, J-Link and a CMSIS-DAP probe with an
@@ -133,7 +133,7 @@ src/
 tests/          Unit tests (Qt Test) with a mock engine
 resources/      Icons, style sheet, bundled chip descriptions
 packaging/      Linux package files, third-party notices
-docs/           Screenshot for this README
+docs/           Demo GIF for this README
 ```
 
 
