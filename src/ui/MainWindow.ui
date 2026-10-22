@@ -466,6 +466,9 @@
           </item>
           <item>
            <widget class="QLineEdit" name="editSlot1Path">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
             <property name="placeholderText">
              <string>Select firmware file...</string>
             </property>
@@ -507,6 +510,9 @@
           </item>
           <item>
            <widget class="QLineEdit" name="editSlot2Path">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
             <property name="placeholderText">
              <string>Select firmware file...</string>
             </property>
