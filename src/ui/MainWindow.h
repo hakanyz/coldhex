@@ -11,6 +11,7 @@
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
 #include "core/ProfileStore.h"
+#include "core/FileWatcher.h"
 #include "engine/ProbeRsEngine.h"
 #include "engine/JLinkEngine.h"
 #include "engine/ProbeInspector.h"
@@ -100,6 +101,12 @@ private:
 
     // Profiles menu: named sets of target and firmware settings.
     void updateHexFileCombo();
+
+    // A file chosen for File 1 / File 2 that is rebuilt on disk: reload it and show "updated".
+    void setupFileBadges();
+    QLabel* addUpdatedBadge(QLabel* title);
+    void watchSlotFile(int slotIndex, const QString& path);
+    void onSlotFileChanged(int slotIndex);
     void setupProfileBar();
     void refreshProfileCombo();
     void updateProfileMarker();
@@ -129,6 +136,12 @@ private:
     ProbeInspector* m_probeInspector = nullptr;
     QSet<QString> m_inspectedProbes;  // probes whose details were already asked for
 
+    FileWatcher* m_fileWatch[2] = {nullptr, nullptr};
+    QLabel* m_lblUpdated[2] = {nullptr, nullptr};
+    int m_changeCount[2] = {0, 0};  // how often each file changed on disk
+    bool m_programRunning = false;  // the running sequence is Program (not Verify)
+    bool m_programmedSlot[2] = {false, false};
+    int m_changeCountAtProgram[2] = {0, 0};
     ProfileCombo* m_comboProfile = nullptr;
     Profile m_profileSnapshot;  // what the shown profile held when it was loaded or saved
     bool m_applyingProfile = false;
