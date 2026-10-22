@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 
 project(coldhex VERSION 0.2.0 LANGUAGES CXX)
 
+# Shown in the program and in the package names: empty for a stable release, "-beta4" for a beta.
+# The release tag must be v<version><suffix>, for example v0.2.0-beta4.
+set(COLDHEX_VERSION_SUFFIX "-beta4")
+set(COLDHEX_VERSION_FULL "${PROJECT_VERSION}${COLDHEX_VERSION_SUFFIX}")
+
 if(WIN32)
     enable_language(RC)
 endif()
@@ -99,7 +104,7 @@ if(WIN32)
     configure_file(resources/coldhex.rc.in ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc @ONLY)
     target_sources(coldhex PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/coldhex.rc)
 endif()
-target_compile_definitions(coldhex PRIVATE COLDHEX_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(coldhex PRIVATE COLDHEX_VERSION="${COLDHEX_VERSION_FULL}")
 
 # Chip descriptions in resources/chips are built into the executable (see resources/chips/README.md).
 file(GLOB CHIP_YAMLS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/chips/*.yaml)
@@ -202,7 +207,7 @@ endif()
 set(CPACK_PACKAGE_NAME "coldhex")
 set(CPACK_PACKAGE_VENDOR "ColdHex Project")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Flash and manage ARM Cortex-M microcontrollers")
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VERSION ${COLDHEX_VERSION_FULL})
 set(CPACK_PACKAGE_EXECUTABLES "coldhex;ColdHex")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "ColdHex")
 
@@ -216,6 +221,9 @@ if(WIN32)
 else()
     # .deb and .tar.gz
     set(CPACK_GENERATOR "DEB;TGZ")
+    # Debian writes a pre-release as 0.2.0~beta4, so that it sorts before 0.2.0.
+    string(REPLACE "-" "~" COLDHEX_DEB_SUFFIX "${COLDHEX_VERSION_SUFFIX}")
+    set(CPACK_DEBIAN_PACKAGE_VERSION "${PROJECT_VERSION}${COLDHEX_DEB_SUFFIX}")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ColdHex Project")
     set(CPACK_DEBIAN_PACKAGE_SECTION "electronics")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
