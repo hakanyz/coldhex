@@ -16,6 +16,11 @@
         <file alias="dock/close.svg">icons/dock/close.svg</file>
         <file alias="dock/minimize.svg">icons/dock/minimize.svg</file>
         <file alias="dock/restore.svg">icons/dock/restore.svg</file>
+        <file alias="profile/update-unchanged.svg">icons/profile/update-unchanged.svg</file>
+        <file alias="profile/update-changed.svg">icons/profile/update-changed.svg</file>
+        <file alias="profile/update-saved.svg">icons/profile/update-saved.svg</file>
+        <file alias="profile/rename.svg">icons/profile/rename.svg</file>
+        <file alias="profile/delete.svg">icons/profile/delete.svg</file>
     </qresource>
     <qresource prefix="/theme">
         <file alias="dark.qss.in">theme/dark.qss.in</file>

@@ -47,6 +47,22 @@ void ChipSelector::restore(const QString& manufacturer, const QString& chip, con
     m_modelBox->setEditText(chip);
 }
 
+void ChipSelector::select(const QString& manufacturer, const QString& chip) {
+    if (m_chips.isEmpty()) {
+        restore(manufacturer, chip, m_customChipFiles);
+        return;
+    }
+
+    const int makerIdx = m_manufacturerBox->findText(manufacturer);
+    if (makerIdx >= 0) m_manufacturerBox->setCurrentIndex(makerIdx);
+
+    m_modelBox->setEditText(chip);
+    QString canonical;
+    if (!chip.isEmpty() && ChipCatalog::find(m_chips, chip, &canonical)) {
+        m_modelBox->setEditText(canonical);
+    }
+}
+
 QString ChipSelector::manufacturer() const {
     return m_manufacturerBox->currentText();
 }

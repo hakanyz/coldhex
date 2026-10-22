@@ -2,6 +2,11 @@
 #include "ui_MainWindow.h"
 #include "core/HexParser.h"
 #include "core/AppSettings.h"
+#include "core/ProfileStore.h"
+#include "ProfileCombo.h"
+#include <QGroupBox>
+#include <QRadioButton>
+#include <QCheckBox>
 #include "engine/ProbeRsLocator.h"
 #include "engine/JLinkLocator.h"
 #include "engine/RoutingEngine.h"
@@ -32,6 +37,9 @@
 #include <QFileDialog>
 #include <QDateTime>
 #include <QMessageBox>
+#include <QInputDialog>
+#include <QRegularExpression>
+#include <QSignalBlocker>
 #include <QFileInfo>
 #include <QFontMetrics>
 #include <QHeaderView>
@@ -83,6 +91,7 @@ MainWindow::MainWindow(QWidget *parent)
     setAcceptDrops(true);
 
     setupUiCustomizations();
+    setupProfileBar();
     setupToolBarWidgets();
 
     m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
@@ -349,6 +358,215 @@ void MainWindow::updateUiState() {
     ui->actionVerify->setEnabled(!busy);
     ui->actionResetTarget->setEnabled(!busy);
     ui->actionCancel->setEnabled(busy);
+    if (m_comboProfile) m_comboProfile->setEnabled(!busy);
+}
+
+void MainWindow::updateHexFileCombo() {
+    if (!m_comboToolbarHexFile) return;
+    while (m_comboToolbarHexFile->count() > 1) {
+        m_comboToolbarHexFile->removeItem(1);
+    }
+    if (!ui->editSlot1Path->text().isEmpty()) {
+        m_comboToolbarHexFile->addItem(QFileInfo(ui->editSlot1Path->text()).fileName());
+    }
+    if (!ui->editSlot2Path->text().isEmpty()) {
+        m_comboToolbarHexFile->addItem(QFileInfo(ui->editSlot2Path->text()).fileName());
+    }
+}
+
+// The profile box sits at the top of the Target Settings panel, next to the settings it stores.
+void MainWindow::setupProfileBar() {
+    m_comboProfile = new ProfileCombo(this);
+
+    auto* box = new QGroupBox("Profiles", this);
+    auto* boxLayout = new QVBoxLayout(box);
+    boxLayout->addWidget(m_comboProfile);
+    ui->layoutSettings->insertWidget(0, box);
+
+    connect(m_comboProfile, &ProfileCombo::profileChosen, this, [this](const QString& name) {
+        QSettings settings;
+        Profile profile;
+        if (ProfileStore::load(settings, name, profile)) applyProfile(name, profile);
+    });
+    connect(m_comboProfile, &ProfileCombo::saveRequested, this, &MainWindow::saveProfileAs);
+    connect(m_comboProfile, &ProfileCombo::updateRequested, this, &MainWindow::updateProfile);
+    connect(m_comboProfile, &ProfileCombo::renameRequested, this, &MainWindow::renameProfile);
+    connect(m_comboProfile, &ProfileCombo::deleteRequested, this, &MainWindow::deleteProfile);
+
+    // Anything the profile stores changing marks the shown profile as modified.
+    auto changed = [this]() { updateProfileMarker(); };
+    connect(ui->comboManufacturer, &QComboBox::currentTextChanged, this, changed);
+    connect(ui->comboModel, &QComboBox::currentTextChanged, this, changed);
+    connect(ui->comboInterface, &QComboBox::currentTextChanged, this, changed);
+    connect(ui->comboSpeed, QOverload<int>::of(&QComboBox::currentIndexChanged), this, changed);
+    for (QCheckBox* check : {ui->checkEraseBeforeFlash, ui->checkVerifyAfterFlash,
+                             ui->checkResetAfterFlash, ui->checkConnectUnderReset}) {
+        connect(check, &QCheckBox::toggled, this, changed);
+    }
+    for (QLineEdit* edit : {ui->editSlot1Path, ui->editSlot2Path, ui->editSlot1Address, ui->editSlot2Address}) {
+        connect(edit, &QLineEdit::textChanged, this, changed);
+    }
+    for (QRadioButton* radio : {ui->radioSourceFile1, ui->radioSourceFile2, ui->radioSourceBoth}) {
+        connect(radio, &QRadioButton::toggled, this, changed);
+    }
+
+    refreshProfileCombo();
+}
+
+void MainWindow::refreshProfileCombo() {
+    QSettings settings;
+    m_comboProfile->setProfiles(ProfileStore::names(settings), m_currentProfile);
+    updateProfileMarker();
+}
+
+// Shows "name *" when the settings differ from what the profile holds.
+void MainWindow::updateProfileMarker() {
+    if (m_applyingProfile || !m_comboProfile) return;
+    m_comboProfile->setModified(!m_currentProfile.isEmpty() && !(collectProfile() == m_profileSnapshot));
+}
+Profile MainWindow::collectProfile() const {
+    Profile p;
+    p.manufacturer = m_chipSelector->manufacturer();
+    p.chip = m_chipSelector->chipText();
+    p.interfaceName = ui->comboInterface->currentText();
+    p.speedKhz = speedKhz();
+    p.slot1Path = ui->editSlot1Path->text();
+    p.slot2Path = ui->editSlot2Path->text();
+    p.slot1Address = ui->editSlot1Address->text();
+    p.slot2Address = ui->editSlot2Address->text();
+    if (ui->radioSourceBoth->isChecked()) {
+        p.firmware = FirmwareChoice::Both;
+    } else if (ui->radioSourceFile1->isChecked()) {
+        p.firmware = FirmwareChoice::File1;
+    } else {
+        p.firmware = FirmwareChoice::File2;
+    }
+    p.eraseBeforeFlash = ui->checkEraseBeforeFlash->isChecked();
+    p.verifyAfterFlash = ui->checkVerifyAfterFlash->isChecked();
+    p.resetAfterFlash = ui->checkResetAfterFlash->isChecked();
+    p.connectUnderReset = ui->checkConnectUnderReset->isChecked();
+    return p;
+}
+
+void MainWindow::applyProfile(const QString& name, const Profile& p) {
+    m_applyingProfile = true;
+    m_chipSelector->select(p.manufacturer, p.chip);
+    const int ifaceIdx = ui->comboInterface->findText(p.interfaceName);
+    if (ifaceIdx >= 0) ui->comboInterface->setCurrentIndex(ifaceIdx);
+    setSpeedKhz(p.speedKhz);
+
+    ui->checkEraseBeforeFlash->setChecked(p.eraseBeforeFlash);
+    ui->checkVerifyAfterFlash->setChecked(p.verifyAfterFlash);
+    ui->checkResetAfterFlash->setChecked(p.resetAfterFlash);
+    ui->checkConnectUnderReset->setChecked(p.connectUnderReset);
+
+    // Addresses first, and the files loaded by hand afterwards: a .bin file is read at its
+    // address, and a profile may keep the path of the file that is already shown.
+    if (!p.slot1Address.isEmpty()) ui->editSlot1Address->setText(p.slot1Address);
+    if (!p.slot2Address.isEmpty()) ui->editSlot2Address->setText(p.slot2Address);
+    {
+        const QSignalBlocker block1(ui->editSlot1Path);
+        const QSignalBlocker block2(ui->editSlot2Path);
+        ui->editSlot1Path->setText(p.slot1Path);
+        ui->editSlot2Path->setText(p.slot2Path);
+    }
+    loadFileIntoSlot(1, p.slot1Path);
+    loadFileIntoSlot(2, p.slot2Path);
+
+    switch (p.firmware) {
+    case FirmwareChoice::File1: ui->radioSourceFile1->setChecked(true); break;
+    case FirmwareChoice::Both: ui->radioSourceBoth->setChecked(true); break;
+    case FirmwareChoice::File2: ui->radioSourceFile2->setChecked(true); break;
+    }
+
+    m_applyingProfile = false;
+    m_currentProfile = name;
+    m_profileSnapshot = collectProfile();
+    refreshProfileCombo();
+    appendLog("INFO", QString("Profile '%1' loaded.").arg(name));
+}
+
+void MainWindow::saveProfileAs() {
+    bool ok = false;
+    QString name = QInputDialog::getText(this, "Save Profile", "Profile name:", QLineEdit::Normal,
+                                         QString(), &ok).trimmed();
+    if (!ok) return;
+    if (!ProfileStore::isValidName(name)) {
+        QMessageBox::warning(this, "Save Profile", "Please enter a name. It cannot contain / or \\.");
+        return;
+    }
+
+    QSettings settings;
+    const QStringList names = ProfileStore::names(settings);
+    const int existing = names.indexOf(QRegularExpression(QRegularExpression::escape(name),
+                                                          QRegularExpression::CaseInsensitiveOption));
+    if (existing >= 0) {
+        name = names.at(existing);
+        const auto answer = QMessageBox::question(this, "Save Profile",
+            QString("A profile named '%1' already exists. Replace it?").arg(name));
+        if (answer != QMessageBox::Yes) return;
+    }
+
+    ProfileStore::save(settings, name, collectProfile());
+    m_currentProfile = name;
+    m_profileSnapshot = collectProfile();
+    refreshProfileCombo();
+    appendLog("INFO", QString("Profile '%1' saved.").arg(name));
+}
+
+void MainWindow::updateProfile(const QString& name) {
+    if (name != m_currentProfile) {
+        const auto answer = QMessageBox::question(this, "Update Profile",
+            QString("Replace the profile '%1' with the current settings?").arg(name));
+        if (answer != QMessageBox::Yes) return;
+    }
+    QSettings settings;
+    ProfileStore::save(settings, name, collectProfile());
+    m_currentProfile = name;
+    m_profileSnapshot = collectProfile();
+    // The list may be open: change the selection without rebuilding it.
+    m_comboProfile->selectProfile(name);
+    m_comboProfile->markSaved(name);
+    appendLog("INFO", QString("Profile '%1' updated.").arg(name));
+}
+
+void MainWindow::renameProfile(const QString& oldName) {
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, "Rename Profile", "New name:", QLineEdit::Normal,
+                                               oldName, &ok).trimmed();
+    if (!ok || name == oldName) return;
+    if (!ProfileStore::isValidName(name)) {
+        QMessageBox::warning(this, "Rename Profile", "Please enter a name. It cannot contain / or \\.");
+        return;
+    }
+
+    QSettings settings;
+    for (const QString& existing : ProfileStore::names(settings)) {
+        // A different capitalisation of the same name is a plain rename (names are not case sensitive).
+        if (existing.compare(name, Qt::CaseInsensitive) == 0 && existing.compare(oldName, Qt::CaseInsensitive) != 0) {
+            QMessageBox::warning(this, "Rename Profile", QString("A profile named '%1' already exists.").arg(existing));
+            return;
+        }
+    }
+
+    Profile profile;
+    if (!ProfileStore::load(settings, oldName, profile)) return;
+    ProfileStore::remove(settings, oldName);
+    ProfileStore::save(settings, name, profile);
+    if (m_currentProfile == oldName) m_currentProfile = name;
+    refreshProfileCombo();
+    appendLog("INFO", QString("Profile '%1' renamed to '%2'.").arg(oldName, name));
+}
+void MainWindow::deleteProfile(const QString& name) {
+    const auto answer = QMessageBox::question(this, "Delete Profile",
+        QString("Delete the profile '%1'?").arg(name));
+    if (answer != QMessageBox::Yes) return;
+
+    QSettings settings;
+    ProfileStore::remove(settings, name);
+    if (m_currentProfile == name) m_currentProfile.clear();
+    refreshProfileCombo();
+    appendLog("INFO", QString("Profile '%1' deleted.").arg(name));
 }
 
 // Fills the probe box with what probe-rs found. Automatic refreshes only write to the log when
@@ -649,7 +867,12 @@ void MainWindow::onSlot2PathChanged(const QString& path) {
 }
 
 void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
-    if (path.isEmpty()) return;
+    if (path.isEmpty()) {
+        (slotIndex == 1 ? m_slot1ParseResult : m_slot2ParseResult) = HexParseResult();
+        updateHexFileCombo();
+        updateMemoryViewer();
+        return;
+    }
 
     QFileInfo fi(path);
     if (!fi.exists()) {
@@ -682,18 +905,8 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
         m_slot2ParseResult = res;
     }
 
-    // Update Toolbar HEX File Combo
-    if (m_comboToolbarHexFile) {
-        while (m_comboToolbarHexFile->count() > 1) {
-            m_comboToolbarHexFile->removeItem(1);
-        }
-        if (!ui->editSlot1Path->text().isEmpty()) {
-            m_comboToolbarHexFile->addItem(QFileInfo(ui->editSlot1Path->text()).fileName());
-        }
-        if (!ui->editSlot2Path->text().isEmpty()) {
-            m_comboToolbarHexFile->addItem(QFileInfo(ui->editSlot2Path->text()).fileName());
-        }
-    }
+    updateHexFileCombo();
+
 
     if (res.success) {
         appendLog("INFO", QString("File '%1' loaded.").arg(fi.fileName()));
