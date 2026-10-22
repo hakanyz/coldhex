@@ -4,7 +4,10 @@ on:
   push:
     branches: [main, develop]
     tags: ['v*']
+    # Text-only changes need no build. Tag pushes are never filtered by path.
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'COPYING']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'COPYING']
   workflow_dispatch:
 
 # A newer push to the same branch makes the older, still running build pointless.
