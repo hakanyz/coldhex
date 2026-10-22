@@ -41,9 +41,9 @@ Desktop.ini
 .DS_Store
 
 
-# Private notes: only the screenshot in docs/ is published
+# Private notes: only the demo GIF in docs/ is published
 docs/*
-!docs/screenshot.png
+!docs/demo.gif
 
 # Downloaded during packaging (probe-rs)
 third_party/
