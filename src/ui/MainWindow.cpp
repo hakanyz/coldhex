@@ -652,7 +652,13 @@ void MainWindow::loadFileIntoSlot(int slotIndex, const QString& path) {
     if (path.isEmpty()) return;
 
     QFileInfo fi(path);
-    if (!fi.exists()) return;
+    if (!fi.exists()) {
+        // The file was moved or renamed since it was chosen: drop what was loaded from it.
+        (slotIndex == 1 ? m_slot1ParseResult : m_slot2ParseResult) = HexParseResult();
+        appendLog("ERROR", QString("File '%1' not found.").arg(path));
+        updateMemoryViewer();
+        return;
+    }
 
     FileFormat fmt = HexParser::detectFormat(path);
     HexParseResult res;
