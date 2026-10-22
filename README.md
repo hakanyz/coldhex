@@ -12,8 +12,8 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 > **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing, programming
 > and the progress display were tried on real hardware: ST-Link, J-Link and a CMSIS-DAP probe with an
 > STM32F407 and an APM32F407. Lock and Unlock were run on those two boards only; the other chip
-> families follow the vendors' own code and are listed in [docs/PROTECTION.md](docs/PROTECTION.md)
-> as not yet tried. Please report problems through the issue tracker.
+> families follow the vendors' own code and have not been tried yet. Please report problems through
+> the issue tracker.
 
 ## Features
 
@@ -29,7 +29,7 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 - **Read-out protection** – after connecting, ColdHex shows whether the chip is read-protected (level
   1) and offers to remove it; Lock and Unlock buttons set and clear level 1. Level 2 is never
   written. Chip families without a known method have the buttons greyed out, with the reason in the
-  tooltip. See [docs/PROTECTION.md](docs/PROTECTION.md) for the families and what is verified.
+  tooltip.
 - **Reliable connections** – SWD or JTAG, adjustable speed, *connect under reset*, and an automatic
   speed reduction that resumes the sequence at the step that failed.
 - **System Check** – on start-up ColdHex looks for probe-rs, connected probes and their drivers and
@@ -133,16 +133,13 @@ src/
 tests/          Unit tests (Qt Test) with a mock engine
 resources/      Icons, style sheet, bundled chip descriptions
 packaging/      Linux package files, third-party notices
-docs/           Architecture, UI guide, test checklist, roadmap
+docs/           Screenshot for this README
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the layers fit together and
-[docs/UI.md](docs/UI.md) for what to change where in the interface.
 
 ## Testing
 
-`ctest` runs the automated tests. Before a release, also work through the
-[manual test checklist](docs/TESTING.md) on real hardware.
+`ctest` runs the automated tests. Before a release, also try the program on real hardware.
 
 ## Contributing
 
