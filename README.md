@@ -50,6 +50,8 @@ Download the package for your system from the
 | Ubuntu 22.04 (64-bit) | `coldhex_<version>_amd64.deb` | `sudo apt install ./coldhex_<version>_amd64.deb` |
 | Linux (64-bit) | `coldhex-<version>-Linux.tar.gz` | Unpack, start `usr/bin/coldhex` (needs the Qt 6 libraries) |
 
+ColdHex is 64-bit only: there are no packages for 32-bit Windows or for ARM.
+
 ### Probe drivers
 
 | Probe | Windows | Linux |
