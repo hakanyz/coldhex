@@ -10,6 +10,7 @@
 #include "core/FirmwareTarget.h"
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
+#include "core/ProfileStore.h"
 #include "engine/ProbeRsEngine.h"
 #include "engine/JLinkEngine.h"
 #include "engine/ProbeInspector.h"
@@ -19,6 +20,9 @@
 #include "OperationStatus.h"
 #include "ChipSelector.h"
 #include "ProbeSelector.h"
+
+class QMenu;
+class ProfileCombo;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -93,6 +97,18 @@ private:
     void updateMemoryViewer();
     void restoreSettings();
     void saveSettings();
+
+    // Profiles menu: named sets of target and firmware settings.
+    void updateHexFileCombo();
+    void setupProfileBar();
+    void refreshProfileCombo();
+    void updateProfileMarker();
+    Profile collectProfile() const;
+    void applyProfile(const QString& name, const Profile& profile);
+    void saveProfileAs();
+    void updateProfile(const QString& name);
+    void renameProfile(const QString& oldName);
+    void deleteProfile(const QString& name);
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
     bool prepareEngine();
@@ -112,6 +128,11 @@ private:
     ProbeSelector* m_probeSelector = nullptr;
     ProbeInspector* m_probeInspector = nullptr;
     QSet<QString> m_inspectedProbes;  // probes whose details were already asked for
+
+    ProfileCombo* m_comboProfile = nullptr;
+    Profile m_profileSnapshot;  // what the shown profile held when it was loaded or saved
+    bool m_applyingProfile = false;
+    QString m_currentProfile;  // the profile last loaded or saved, empty when none
 
     // Additional toolbar widgets
     QComboBox *m_comboToolbarHexFile = nullptr;

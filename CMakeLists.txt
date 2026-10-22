@@ -22,6 +22,8 @@ set(SOURCES
     src/ui/MainWindow.ui
     src/ui/HexMemoryModel.h
     src/ui/HexMemoryModel.cpp
+    src/ui/ProfileCombo.h
+    src/ui/ProfileCombo.cpp
     src/core/FirmwareTarget.h
     src/core/HexParser.h
     src/core/HexParser.cpp
@@ -29,6 +31,8 @@ set(SOURCES
     src/core/FlashCoordinator.cpp
     src/core/AppSettings.h
     src/core/AppSettings.cpp
+    src/core/ProfileStore.h
+    src/core/ProfileStore.cpp
     src/core/SlotValidator.h
     src/core/SlotValidator.cpp
     src/core/ChipCatalog.h
@@ -255,6 +259,15 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_appsettings PRIVATE src)
     target_link_libraries(tst_appsettings PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_appsettings COMMAND tst_appsettings)
+
+    add_executable(tst_profilestore
+        tests/tst_profilestore.cpp
+        src/core/ProfileStore.cpp
+        src/core/ProfileStore.h
+    )
+    target_include_directories(tst_profilestore PRIVATE src)
+    target_link_libraries(tst_profilestore PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_profilestore COMMAND tst_profilestore)
 
     add_executable(tst_slotvalidator
         tests/tst_slotvalidator.cpp
