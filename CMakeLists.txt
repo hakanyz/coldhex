@@ -33,6 +33,8 @@ set(SOURCES
     src/core/AppSettings.cpp
     src/core/ProfileStore.h
     src/core/ProfileStore.cpp
+    src/core/FileWatcher.h
+    src/core/FileWatcher.cpp
     src/core/SlotValidator.h
     src/core/SlotValidator.cpp
     src/core/ChipCatalog.h
@@ -259,6 +261,15 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_appsettings PRIVATE src)
     target_link_libraries(tst_appsettings PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_appsettings COMMAND tst_appsettings)
+
+    add_executable(tst_filewatcher
+        tests/tst_filewatcher.cpp
+        src/core/FileWatcher.cpp
+        src/core/FileWatcher.h
+    )
+    target_include_directories(tst_filewatcher PRIVATE src)
+    target_link_libraries(tst_filewatcher PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_filewatcher COMMAND tst_filewatcher)
 
     add_executable(tst_profilestore
         tests/tst_profilestore.cpp
