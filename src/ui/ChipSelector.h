@@ -25,6 +25,9 @@ public:
     // Applies values from the saved settings; they take effect once the chip list is known.
     void restore(const QString& manufacturer, const QString& chip, const QStringList& customChipFiles);
 
+    // Switches to a chip right now (a profile was loaded). Works before the chip list is known too.
+    void select(const QString& manufacturer, const QString& chip);
+
     QString manufacturer() const;
     QString chipText() const;
     QStringList customChipFiles() const { return m_customChipFiles; }
