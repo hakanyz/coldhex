@@ -12,6 +12,7 @@
 #include "core/SlotValidator.h"
 #include "core/ProfileStore.h"
 #include "core/UpdateInfo.h"
+#include "engine/SystemCheck.h"
 #include "core/FileWatcher.h"
 #include "engine/ProbeRsEngine.h"
 #include "engine/JLinkEngine.h"
@@ -27,6 +28,7 @@ class QMenu;
 class ProfileCombo;
 class Updater;
 class QCheckBox;
+class QThread;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -122,6 +124,8 @@ private:
     void importProfiles();
 
     // Help > Check for Updates, and the quiet check at start-up.
+    void startSetupCheck();
+    void onSetupChecked(const QString& probeRsPath, const SystemCheck::Input& input);
     void setupUpdates();
     void rememberUpdateCheck();
     QCheckBox* makeStartupCheckBox(QWidget* parent);
@@ -155,6 +159,7 @@ private:
     bool m_programmedSlot[2] = {false, false};
     int m_changeCountAtProgram[2] = {0, 0};
     Updater* m_updater = nullptr;
+    QThread* m_setupCheckThread = nullptr;
     ProfileCombo* m_comboProfile = nullptr;
     Profile m_profileSnapshot;  // what the shown profile held when it was loaded or saved
     bool m_applyingProfile = false;
