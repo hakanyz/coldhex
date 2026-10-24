@@ -76,7 +76,7 @@ CMSIS-DAP probes did not show this.
    `.bin` files enter the start address; HEX and ELF files carry their own addresses.
 5. Press **Program**.
 
-To switch between boards quickly, save the settings as a profile in the **Profiles** box (top of Target Settings). Hover the selected profile in the list to rename it, save changes to it or delete it. A profile keeps the chip, interface, speed, options, firmware files and Data Source, but not the probe.
+To switch between boards quickly, save the settings as a profile in the **Profiles** box (top of Target Settings). Hover the selected profile in the list to rename it, save changes to it or delete it. A profile keeps the chip, interface, speed, options, firmware files and Data Source, but not the probe. **File > Export Profiles...** saves them to a JSON file and **File > Import Profiles...** reads one back, for another computer or as a backup; firmware file paths are only written when you ask for them.
 
 ## Chips that probe-rs does not know
 

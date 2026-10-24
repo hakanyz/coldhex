@@ -29,6 +29,8 @@ set(SOURCES
     src/ui/HexMemoryModel.cpp
     src/ui/ProfileCombo.h
     src/ui/ProfileCombo.cpp
+    src/ui/ProfileTransferDialog.h
+    src/ui/ProfileTransferDialog.cpp
     src/core/FirmwareTarget.h
     src/core/HexParser.h
     src/core/HexParser.cpp
@@ -38,6 +40,8 @@ set(SOURCES
     src/core/AppSettings.cpp
     src/core/ProfileStore.h
     src/core/ProfileStore.cpp
+    src/core/ProfileTransfer.h
+    src/core/ProfileTransfer.cpp
     src/core/FileWatcher.h
     src/core/FileWatcher.cpp
     src/core/SlotValidator.h
@@ -278,6 +282,19 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_filewatcher PRIVATE src)
     target_link_libraries(tst_filewatcher PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_filewatcher COMMAND tst_filewatcher)
+
+    add_executable(tst_profiletransfer
+        tests/tst_profiletransfer.cpp
+        src/core/ProfileTransfer.cpp
+        src/core/ProfileTransfer.h
+        src/core/ProfileStore.cpp
+        src/core/ProfileStore.h
+        src/core/SlotValidator.cpp
+        src/core/SlotValidator.h
+    )
+    target_include_directories(tst_profiletransfer PRIVATE src)
+    target_link_libraries(tst_profiletransfer PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_profiletransfer COMMAND tst_profiletransfer)
 
     add_executable(tst_profilestore
         tests/tst_profilestore.cpp
