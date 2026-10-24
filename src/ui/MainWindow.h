@@ -26,6 +26,7 @@
 class QMenu;
 class ProfileCombo;
 class Updater;
+class QCheckBox;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -123,6 +124,8 @@ private:
     // Help > Check for Updates, and the quiet check at start-up.
     void setupUpdates();
     void rememberUpdateCheck();
+    QCheckBox* makeStartupCheckBox(QWidget* parent);
+    void saveStartupCheck(bool on);
     void onUpdateAvailable(const ReleaseInfo& release, bool manual);
     void deleteProfile(const QString& name);
     bool slotAddress(int slotIndex, uint32_t& address) const;
