@@ -4,6 +4,9 @@
 #include "core/AppSettings.h"
 #include "core/ProfileStore.h"
 #include "ProfileCombo.h"
+#include "ProfileTransferDialog.h"
+#include "core/ProfileTransfer.h"
+#include <QSaveFile>
 #include "Theme.h"
 #include <QGroupBox>
 #include <QRadioButton>
@@ -454,6 +457,15 @@ void MainWindow::setupProfileBar() {
         connect(radio, &QRadioButton::toggled, this, changed);
     }
 
+    // Import and Export sit in the File menu, above Exit.
+    auto* importAct = new QAction("Import Profiles...", this);
+    auto* exportAct = new QAction("Export Profiles...", this);
+    connect(importAct, &QAction::triggered, this, &MainWindow::importProfiles);
+    connect(exportAct, &QAction::triggered, this, &MainWindow::exportProfiles);
+    ui->menuFile->insertAction(ui->actionExit, importAct);
+    ui->menuFile->insertAction(ui->actionExit, exportAct);
+    ui->menuFile->insertSeparator(ui->actionExit);
+
     refreshProfileCombo();
 }
 
@@ -600,6 +612,111 @@ void MainWindow::renameProfile(const QString& oldName) {
     if (m_currentProfile == oldName) m_currentProfile = name;
     refreshProfileCombo();
     appendLog("INFO", QString("Profile '%1' renamed to '%2'.").arg(oldName, name));
+}
+void MainWindow::exportProfiles() {
+    QSettings settings;
+    const QStringList names = ProfileStore::names(settings);
+    if (names.isEmpty()) {
+        QMessageBox::information(this, "Export Profiles", "There are no profiles to export yet. Save one first with the Profiles box.");
+        return;
+    }
+
+    bool includePaths = false;
+    const QStringList chosen = ProfileTransferDialog::askExport(this, names, includePaths);
+    if (chosen.isEmpty()) return;
+
+    const QString suggested = QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).filePath("coldhex-profiles.json");
+    const QString path = QFileDialog::getSaveFileName(this, "Export Profiles", suggested, "ColdHex profiles (*.json);;All Files (*.*)");
+    if (path.isEmpty()) return;
+
+    QList<NamedProfile> profiles;
+    for (const QString& name : chosen) {
+        Profile profile;
+        if (ProfileStore::load(settings, name, profile)) profiles.append({name, profile});
+    }
+
+    const QByteArray json = ProfileTransfer::toJson(profiles, QApplication::applicationVersion(), includePaths,
+                                                    QFileInfo(path).absolutePath());
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(json) != json.size() || !file.commit()) {
+        QMessageBox::warning(this, "Export Profiles", QString("Could not write '%1':\n%2").arg(path, file.errorString()));
+        return;
+    }
+    appendLog("INFO", QString("Exported %1 profile(s) to '%2'.").arg(profiles.size()).arg(QFileInfo(path).fileName()));
+}
+
+void MainWindow::importProfiles() {
+    const QString path = QFileDialog::getOpenFileName(
+        this, "Import Profiles", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        "ColdHex profiles (*.json);;All Files (*.*)");
+    if (path.isEmpty()) return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "Import Profiles", QString("Could not read '%1':\n%2").arg(path, file.errorString()));
+        return;
+    }
+    const QByteArray data = file.read(ProfileTransfer::kMaxFileBytes + 1);
+    const ImportResult result = ProfileTransfer::fromJson(data, QFileInfo(path).absolutePath());
+    if (!result.ok()) {
+        QString message = result.error;
+        if (!result.skipped.isEmpty()) message += "\n\n" + result.skipped.join('\n');
+        QMessageBox::warning(this, "Import Profiles", message);
+        return;
+    }
+
+    QSettings settings;
+    QStringList existing = ProfileStore::names(settings);
+    ProfileTransferDialog::ImportChoice choice;
+    if (!ProfileTransferDialog::askImport(this, result.profiles, existing, choice)) return;
+
+    int imported = 0;
+    int replaced = 0;
+    int renamed = 0;
+    int skipped = 0;
+    int missingFiles = 0;
+    for (const NamedProfile& incoming : choice.profiles) {
+        QString name = incoming.name;
+        int clash = -1;
+        for (int i = 0; i < existing.size(); ++i) {
+            if (existing[i].compare(name, Qt::CaseInsensitive) == 0) clash = i;
+        }
+        if (clash >= 0) {
+            if (choice.conflict == ProfileTransferDialog::Conflict::Skip) {
+                ++skipped;
+                continue;
+            }
+            if (choice.conflict == ProfileTransferDialog::Conflict::Replace) {
+                name = existing[clash];
+                ++replaced;
+            } else {
+                name = ProfileTransfer::uniqueName(incoming.name, existing);
+                ++renamed;
+            }
+        }
+        ProfileStore::save(settings, name, incoming.profile);
+        if (!existing.contains(name, Qt::CaseInsensitive)) existing << name;
+        ++imported;
+        for (const QString& file : {incoming.profile.slot1Path, incoming.profile.slot2Path}) {
+            if (!file.isEmpty() && !QFileInfo::exists(file)) ++missingFiles;
+        }
+    }
+
+    refreshProfileCombo();
+    QString summary = QString("Imported %1 profile(s) from '%2'").arg(imported).arg(QFileInfo(path).fileName());
+    QStringList notes;
+    if (replaced) notes << QString("%1 replaced").arg(replaced);
+    if (renamed) notes << QString("%1 renamed").arg(renamed);
+    if (skipped) notes << QString("%1 skipped").arg(skipped);
+    if (!notes.isEmpty()) summary += " (" + notes.join(", ") + ")";
+    appendLog("INFO", summary + ".");
+    if (missingFiles > 0) {
+        appendLog("WARNING", QString("%1 firmware file(s) named in the imported profiles were not found on this computer.").arg(missingFiles));
+    }
+    if (!result.skipped.isEmpty()) {
+        QMessageBox::information(this, "Import Profiles",
+                                 "Some entries in the file were not imported:\n\n" + result.skipped.join('\n'));
+    }
 }
 void MainWindow::deleteProfile(const QString& name) {
     const auto answer = QMessageBox::question(this, "Delete Profile",
