@@ -6,6 +6,8 @@ project(coldhex VERSION 1.0.1 LANGUAGES CXX)
 # The release tag must be v<version><suffix>, for example v1.0.0.
 set(COLDHEX_VERSION_SUFFIX "")
 set(COLDHEX_VERSION_FULL "${PROJECT_VERSION}${COLDHEX_VERSION_SUFFIX}")
+# The Windows installer (packaging/windows/coldhex.iss) is built by the workflow and takes its version from here.
+file(WRITE "${CMAKE_BINARY_DIR}/coldhex-version.txt" "${COLDHEX_VERSION_FULL}")
 
 if(WIN32)
     enable_language(RC)
@@ -221,12 +223,8 @@ set(CPACK_PACKAGE_EXECUTABLES "coldhex;ColdHex")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "ColdHex")
 
 if(WIN32)
-    # .zip (portable) and .exe (installer)
-    set(CPACK_GENERATOR "ZIP;NSIS")
-    set(CPACK_NSIS_DISPLAY_NAME "ColdHex")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "coldhex.exe")
-    set(CPACK_NSIS_MODIFY_PATH OFF)
-    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    # .zip (portable). The installer is made by Inno Setup, see packaging/windows/coldhex.iss.
+    set(CPACK_GENERATOR "ZIP")
 else()
     # .deb and .tar.gz
     set(CPACK_GENERATOR "DEB;TGZ")

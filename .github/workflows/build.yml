@@ -66,15 +66,18 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
-      - name: Install NSIS
-        run: choco install nsis -y --no-progress
-
-      - name: Package (.zip and .exe)
+      - name: Package (.zip)
         shell: bash
+        run: cd build && cpack -G ZIP
+
+      # Inno Setup is part of the Windows runner image. The installer is for the current user only.
+      - name: Installer (.exe)
+        shell: pwsh
         run: |
-          export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          cd build
-          cpack -G "ZIP;NSIS"
+          $version = (Get-Content build/coldhex-version.txt -Raw).Trim()
+          cmake --install build --prefix "$PWD/stage"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DSourceDir=$PWD\stage" "/DOutputDir=$PWD\build" packaging\windows\coldhex.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
 
       - uses: actions/upload-artifact@v4
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
