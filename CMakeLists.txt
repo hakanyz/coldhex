@@ -18,7 +18,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 
 set(SOURCES
     src/app/main.cpp
@@ -29,6 +29,8 @@ set(SOURCES
     src/ui/HexMemoryModel.cpp
     src/ui/ProfileCombo.h
     src/ui/ProfileCombo.cpp
+    src/ui/Updater.h
+    src/ui/Updater.cpp
     src/ui/ProfileTransferDialog.h
     src/ui/ProfileTransferDialog.cpp
     src/core/FirmwareTarget.h
@@ -42,6 +44,8 @@ set(SOURCES
     src/core/ProfileStore.cpp
     src/core/ProfileTransfer.h
     src/core/ProfileTransfer.cpp
+    src/core/UpdateInfo.h
+    src/core/UpdateInfo.cpp
     src/core/FileWatcher.h
     src/core/FileWatcher.cpp
     src/core/SlotValidator.h
@@ -126,6 +130,7 @@ target_include_directories(coldhex PRIVATE
 
 target_link_libraries(coldhex PRIVATE
     Qt6::Widgets
+    Qt6::Network
 )
 
 set_target_properties(coldhex PROPERTIES
@@ -282,6 +287,15 @@ if(COLDHEX_BUILD_TESTS)
     target_include_directories(tst_filewatcher PRIVATE src)
     target_link_libraries(tst_filewatcher PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME tst_filewatcher COMMAND tst_filewatcher)
+
+    add_executable(tst_updateinfo
+        tests/tst_updateinfo.cpp
+        src/core/UpdateInfo.cpp
+        src/core/UpdateInfo.h
+    )
+    target_include_directories(tst_updateinfo PRIVATE src)
+    target_link_libraries(tst_updateinfo PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME tst_updateinfo COMMAND tst_updateinfo)
 
     add_executable(tst_profiletransfer
         tests/tst_profiletransfer.cpp

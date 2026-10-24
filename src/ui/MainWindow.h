@@ -11,6 +11,7 @@
 #include "core/HexParser.h"
 #include "core/SlotValidator.h"
 #include "core/ProfileStore.h"
+#include "core/UpdateInfo.h"
 #include "core/FileWatcher.h"
 #include "engine/ProbeRsEngine.h"
 #include "engine/JLinkEngine.h"
@@ -24,6 +25,7 @@
 
 class QMenu;
 class ProfileCombo;
+class Updater;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -117,6 +119,11 @@ private:
     void renameProfile(const QString& oldName);
     void exportProfiles();
     void importProfiles();
+
+    // Help > Check for Updates, and the quiet check at start-up.
+    void setupUpdates();
+    void rememberUpdateCheck();
+    void onUpdateAvailable(const ReleaseInfo& release, bool manual);
     void deleteProfile(const QString& name);
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
@@ -144,6 +151,7 @@ private:
     bool m_programRunning = false;  // the running sequence is Program (not Verify)
     bool m_programmedSlot[2] = {false, false};
     int m_changeCountAtProgram[2] = {0, 0};
+    Updater* m_updater = nullptr;
     ProfileCombo* m_comboProfile = nullptr;
     Profile m_profileSnapshot;  // what the shown profile held when it was loaded or saved
     bool m_applyingProfile = false;
