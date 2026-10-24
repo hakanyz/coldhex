@@ -46,12 +46,14 @@ Download the package for your system from the
 
 | System | File | How |
 |---|---|---|
-| Windows 10/11 (64-bit) | `coldhex-<version>-win64.exe` | Run the installer |
+| Windows 10/11 (64-bit) | `coldhex-<version>-win64.exe` | Run the installer (it installs for your user only and needs no administrator rights) |
 | Windows 10/11 (64-bit) | `coldhex-<version>-win64.zip` | Unpack anywhere, start `bin\coldhex.exe` |
 | Ubuntu 22.04 (64-bit) | `coldhex_<version>_amd64.deb` | `sudo apt install ./coldhex_<version>_amd64.deb` |
 | Linux (64-bit) | `coldhex-<version>-Linux.tar.gz` | Unpack, start `usr/bin/coldhex` (needs the Qt 6 libraries) |
 
 ColdHex is 64-bit only: there are no packages for 32-bit Windows or for ARM.
+
+Versions up to 1.0.1 were installed for all users into Program Files. The newer installer does not replace that copy but offers to remove it; your profiles and settings are kept.
 
 ### Probe drivers
 
