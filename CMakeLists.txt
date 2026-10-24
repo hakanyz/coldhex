@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(coldhex VERSION 0.2.0 LANGUAGES CXX)
+project(coldhex VERSION 1.0.0 LANGUAGES CXX)
 
-# Shown in the program and in the package names: empty for a stable release, "-beta4" for a beta.
-# The release tag must be v<version><suffix>, for example v0.2.0-beta4.
-set(COLDHEX_VERSION_SUFFIX "-beta4")
+# Shown in the program and in the package names: empty for a stable release, "-beta1" for a pre-release.
+# The release tag must be v<version><suffix>, for example v1.0.0.
+set(COLDHEX_VERSION_SUFFIX "")
 set(COLDHEX_VERSION_FULL "${PROJECT_VERSION}${COLDHEX_VERSION_SUFFIX}")
 
 if(WIN32)
@@ -221,7 +221,7 @@ if(WIN32)
 else()
     # .deb and .tar.gz
     set(CPACK_GENERATOR "DEB;TGZ")
-    # Debian writes a pre-release as 0.2.0~beta4, so that it sorts before 0.2.0.
+    # Debian writes a pre-release as 1.0.0~beta1, so that it sorts before 1.0.0.
     string(REPLACE "-" "~" COLDHEX_DEB_SUFFIX "${COLDHEX_VERSION_SUFFIX}")
     set(CPACK_DEBIAN_PACKAGE_VERSION "${PROJECT_VERSION}${COLDHEX_DEB_SUFFIX}")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "ColdHex Project")

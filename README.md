@@ -9,7 +9,7 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 
 ![ColdHex: switching profiles, the memory view and the Updated note](docs/demo.gif)
 
-> **Status: beta.** The logic is covered by automated tests. Connecting, reading, erasing, programming
+> **Status:** the logic is covered by automated tests. Connecting, reading, erasing, programming
 > and the progress display were tried on real hardware: ST-Link, J-Link and a CMSIS-DAP probe with an
 > STM32F407 and an APM32F407. Lock and Unlock were run on those two boards only; the other chip
 > families follow the vendors' own code and have not been tried yet. Please report problems through
