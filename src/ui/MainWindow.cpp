@@ -622,8 +622,13 @@ void MainWindow::setupUpdates() {
     connect(m_updater, &Updater::upToDate, this, [this](bool manual) {
         rememberUpdateCheck();
         if (manual) {
-            QMessageBox::information(this, "Check for Updates",
-                QString("You have the latest version of ColdHex (%1).").arg(QApplication::applicationVersion()));
+            QMessageBox box(QMessageBox::Information, "Check for Updates",
+                            QString("You have the latest version of ColdHex (%1).").arg(QApplication::applicationVersion()),
+                            QMessageBox::Ok, this);
+            QCheckBox* startup = makeStartupCheckBox(&box);
+            box.setCheckBox(startup);
+            box.exec();
+            saveStartupCheck(startup->isChecked());
         }
     });
     connect(m_updater, &Updater::failed, this, [this](const QString& reason, bool manual) {
@@ -634,22 +639,8 @@ void MainWindow::setupUpdates() {
     auto* checkNow = new QAction("Check for Updates...", this);
     connect(checkNow, &QAction::triggered, this, [this]() { m_updater->check(true); });
 
-    auto* atStartup = new QAction("Check for Updates at Startup", this);
-    atStartup->setCheckable(true);
-    {
-        QSettings settings;
-        atStartup->setChecked(UpdateSettings::load(settings).checkOnStartup);
-    }
-    connect(atStartup, &QAction::toggled, this, [](bool on) {
-        QSettings settings;
-        UpdateSettings u = UpdateSettings::load(settings);
-        u.checkOnStartup = on;
-        u.save(settings);
-    });
-
     ui->menuHelp->insertSeparator(ui->actionAbout);
     ui->menuHelp->insertAction(ui->actionAbout, checkNow);
-    ui->menuHelp->insertAction(ui->actionAbout, atStartup);
     ui->menuHelp->insertSeparator(ui->actionAbout);
 
     // Once a day at most, a few seconds after the window is up.
@@ -658,6 +649,22 @@ void MainWindow::setupUpdates() {
         const UpdateSettings u = UpdateSettings::load(settings);
         if (u.checkOnStartup && UpdateInfo::isDue(u.lastCheck, QDateTime::currentDateTimeUtc())) m_updater->check(false);
     });
+}
+
+// The start-up check can be switched off here, in the windows that report on updates.
+QCheckBox* MainWindow::makeStartupCheckBox(QWidget* parent) {
+    auto* box = new QCheckBox("Check for updates at startup", parent);
+    QSettings settings;
+    box->setChecked(UpdateSettings::load(settings).checkOnStartup);
+    return box;
+}
+
+void MainWindow::saveStartupCheck(bool on) {
+    QSettings settings;
+    UpdateSettings u = UpdateSettings::load(settings);
+    if (u.checkOnStartup == on) return;
+    u.checkOnStartup = on;
+    u.save(settings);
 }
 
 void MainWindow::rememberUpdateCheck() {
@@ -687,7 +694,10 @@ void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
     QPushButton* view = box.addButton("View Release", QMessageBox::AcceptRole);
     box.addButton("Remind Me Later", QMessageBox::RejectRole);
     QPushButton* skip = box.addButton("Skip This Version", QMessageBox::DestructiveRole);
+    QCheckBox* startup = makeStartupCheckBox(&box);
+    box.setCheckBox(startup);
     box.exec();
+    saveStartupCheck(startup->isChecked());
 
     if (box.clickedButton() == view && !release.pageUrl.isEmpty()) {
         QDesktopServices::openUrl(QUrl(release.pageUrl));
