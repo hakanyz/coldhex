@@ -17,6 +17,7 @@
 #include "engine/JLinkLocator.h"
 #include "engine/RoutingEngine.h"
 #include "SystemCheckDialog.h"
+#include <QThread>
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCloseEvent>
@@ -180,21 +181,37 @@ MainWindow::MainWindow(QWidget *parent)
     m_chipSelector->requestChips();
 
     // After the window is up, check the setup and open the System Check only if something needs fixing.
-    QTimer::singleShot(0, this, [this]() {
-        auto* dialog = new SystemCheckDialog(currentProbeRsPath(), this);
-        dialog->setAttribute(Qt::WA_DeleteOnClose);
-        if (dialog->runCheck()) {
-            dialog->open();
-        } else {
-            dialog->deleteLater();
-        }
-    });
+    QTimer::singleShot(0, this, &MainWindow::startSetupCheck);
     appendLog("INFO", QString("ColdHex v%1 started.").arg(QApplication::applicationVersion()));
     updateUiState();
 }
 
 MainWindow::~MainWindow() {
+    // The check may still be waiting for another program; the thread must not outlive the window.
+    if (m_setupCheckThread) m_setupCheckThread->wait();
     delete ui;
+}
+
+// The check starts other programs (probe-rs, PowerShell) and waits for them, about a second in all.
+// It runs in its own thread so that the window is painted and usable meanwhile.
+void MainWindow::startSetupCheck() {
+    const QString probeRs = currentProbeRsPath();
+    m_setupCheckThread = QThread::create([this, probeRs]() {
+        const SystemCheck::Input input = SystemCheck::gather(probeRs);
+        QMetaObject::invokeMethod(this, [this, probeRs, input]() { onSetupChecked(probeRs, input); }, Qt::QueuedConnection);
+    });
+    m_setupCheckThread->setParent(this);
+    m_setupCheckThread->start();
+}
+
+void MainWindow::onSetupChecked(const QString& probeRsPath, const SystemCheck::Input& input) {
+    auto* dialog = new SystemCheckDialog(probeRsPath, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    if (dialog->showResult(input)) {
+        dialog->open();
+    } else {
+        dialog->deleteLater();
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {

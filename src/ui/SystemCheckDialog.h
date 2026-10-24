@@ -14,7 +14,11 @@ public:
     explicit SystemCheckDialog(const QString& probeRsPath, QWidget* parent = nullptr);
 
     // Runs the check and fills the dialog. Returns true when something needs the user's attention.
+    // The check waits for other programs, so it is slow: it freezes the window while it runs.
     bool runCheck();
+
+    // Fills the dialog from a check that was made elsewhere (for example in another thread).
+    bool showResult(const SystemCheck::Input& input);
 
 private:
     static QString toHtml(const QList<CheckItem>& items);
