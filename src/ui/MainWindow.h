@@ -115,6 +115,8 @@ private:
     void saveProfileAs();
     void updateProfile(const QString& name);
     void renameProfile(const QString& oldName);
+    void exportProfiles();
+    void importProfiles();
     void deleteProfile(const QString& name);
     bool slotAddress(int slotIndex, uint32_t& address) const;
     bool buildSlot(int slotIndex, FirmwareSlot& slot, AddressRange& range);
