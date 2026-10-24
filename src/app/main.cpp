@@ -2,9 +2,13 @@
 #include "ui/Theme.h"
 #include <QApplication>
 #include <QIcon>
+#include <QNetworkProxyFactory>
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+
+    // The update check should work behind the proxy of a company network.
+    QNetworkProxyFactory::setUseSystemConfiguration(true);
 
     app.setApplicationName("ColdHex");
     app.setApplicationVersion(COLDHEX_VERSION);
