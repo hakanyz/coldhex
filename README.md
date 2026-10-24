@@ -35,6 +35,7 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 - **System Check** – on start-up ColdHex looks for probe-rs, connected probes and their drivers and
   tells you what is missing and how to fix it (Help > System Check).
 - **Memory viewer** – inspect a HEX/BIN/ELF file or the data read back from the chip.
+- **Update notice** – once a day at start-up ColdHex asks GitHub whether a newer release exists and tells you; it installs nothing by itself (Help > Check for Updates, and Check for Updates at Startup to turn it off).
 - **Self-contained packages** – probe-rs is included, and so are the Qt libraries on Windows (on Ubuntu apt installs them); nothing else to install
   apart from the probe driver on Windows.
 

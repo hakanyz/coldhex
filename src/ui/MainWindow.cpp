@@ -4,6 +4,8 @@
 #include "core/AppSettings.h"
 #include "core/ProfileStore.h"
 #include "ProfileCombo.h"
+#include "Updater.h"
+#include <QDesktopServices>
 #include "ProfileTransferDialog.h"
 #include "core/ProfileTransfer.h"
 #include <QSaveFile>
@@ -97,6 +99,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupUiCustomizations();
     setupProfileBar();
     setupFileBadges();
+    setupUpdates();
     setupToolBarWidgets();
 
     m_operationStatus = new OperationStatus(ui->statusBar, m_engine, m_coordinator, this);
@@ -612,6 +615,86 @@ void MainWindow::renameProfile(const QString& oldName) {
     if (m_currentProfile == oldName) m_currentProfile = name;
     refreshProfileCombo();
     appendLog("INFO", QString("Profile '%1' renamed to '%2'.").arg(oldName, name));
+}
+void MainWindow::setupUpdates() {
+    m_updater = new Updater(this);
+    connect(m_updater, &Updater::updateAvailable, this, &MainWindow::onUpdateAvailable);
+    connect(m_updater, &Updater::upToDate, this, [this](bool manual) {
+        rememberUpdateCheck();
+        if (manual) {
+            QMessageBox::information(this, "Check for Updates",
+                QString("You have the latest version of ColdHex (%1).").arg(QApplication::applicationVersion()));
+        }
+    });
+    connect(m_updater, &Updater::failed, this, [this](const QString& reason, bool manual) {
+        // A check at start-up stays quiet: no internet, or a blocked network, is nothing to report.
+        if (manual) QMessageBox::warning(this, "Check for Updates", QString("Could not check for updates:\n%1").arg(reason));
+    });
+
+    auto* checkNow = new QAction("Check for Updates...", this);
+    connect(checkNow, &QAction::triggered, this, [this]() { m_updater->check(true); });
+
+    auto* atStartup = new QAction("Check for Updates at Startup", this);
+    atStartup->setCheckable(true);
+    {
+        QSettings settings;
+        atStartup->setChecked(UpdateSettings::load(settings).checkOnStartup);
+    }
+    connect(atStartup, &QAction::toggled, this, [](bool on) {
+        QSettings settings;
+        UpdateSettings u = UpdateSettings::load(settings);
+        u.checkOnStartup = on;
+        u.save(settings);
+    });
+
+    ui->menuHelp->insertSeparator(ui->actionAbout);
+    ui->menuHelp->insertAction(ui->actionAbout, checkNow);
+    ui->menuHelp->insertAction(ui->actionAbout, atStartup);
+    ui->menuHelp->insertSeparator(ui->actionAbout);
+
+    // Once a day at most, a few seconds after the window is up.
+    QTimer::singleShot(3000, this, [this]() {
+        QSettings settings;
+        const UpdateSettings u = UpdateSettings::load(settings);
+        if (u.checkOnStartup && UpdateInfo::isDue(u.lastCheck, QDateTime::currentDateTimeUtc())) m_updater->check(false);
+    });
+}
+
+void MainWindow::rememberUpdateCheck() {
+    QSettings settings;
+    UpdateSettings u = UpdateSettings::load(settings);
+    u.lastCheck = QDateTime::currentDateTimeUtc();
+    u.save(settings);
+}
+
+void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
+    rememberUpdateCheck();
+
+    QSettings settings;
+    UpdateSettings u = UpdateSettings::load(settings);
+    if (!manual && release.version == u.skippedVersion) return;
+
+    // Never open a window in the middle of programming or reading a chip.
+    if (m_isOperationRunning || m_engine->isBusy()) {
+        appendLog("INFO", QString("ColdHex %1 is available. Use Help > Check for Updates when you are ready.").arg(release.version));
+        return;
+    }
+
+    QMessageBox box(QMessageBox::Information, "Update Available",
+                    QString("ColdHex %1 is available. You are using %2.").arg(release.version, QApplication::applicationVersion()),
+                    QMessageBox::NoButton, this);
+    if (!release.notes.trimmed().isEmpty()) box.setDetailedText(release.notes.trimmed());
+    QPushButton* view = box.addButton("View Release", QMessageBox::AcceptRole);
+    box.addButton("Remind Me Later", QMessageBox::RejectRole);
+    QPushButton* skip = box.addButton("Skip This Version", QMessageBox::DestructiveRole);
+    box.exec();
+
+    if (box.clickedButton() == view && !release.pageUrl.isEmpty()) {
+        QDesktopServices::openUrl(QUrl(release.pageUrl));
+    } else if (box.clickedButton() == skip) {
+        u.skippedVersion = release.version;
+        u.save(settings);
+    }
 }
 void MainWindow::exportProfiles() {
     QSettings settings;
