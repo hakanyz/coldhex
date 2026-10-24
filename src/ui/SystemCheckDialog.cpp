@@ -26,9 +26,13 @@ SystemCheckDialog::SystemCheckDialog(const QString& probeRsPath, QWidget* parent
 
 bool SystemCheckDialog::runCheck() {
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    const QList<CheckItem> items = SystemCheck::evaluate(SystemCheck::gather(m_probeRsPath));
+    const SystemCheck::Input input = SystemCheck::gather(m_probeRsPath);
     QApplication::restoreOverrideCursor();
+    return showResult(input);
+}
 
+bool SystemCheckDialog::showResult(const SystemCheck::Input& input) {
+    const QList<CheckItem> items = SystemCheck::evaluate(input);
     m_view->setHtml(toHtml(items));
     return SystemCheck::needsAttention(items);
 }
