@@ -2,6 +2,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QDir>
+#include <QFile>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -120,13 +122,61 @@ private slots:
         QVERIFY(why.contains("limiting"));
     }
 
-    void checksOnlyOnceADay() {
-        const QDateTime now = utc("2026-10-24T12:00:00Z");
-        QVERIFY(UpdateInfo::isDue(QDateTime(), now));
-        QVERIFY(!UpdateInfo::isDue(now.addSecs(-23 * 3600), now));
-        QVERIFY(UpdateInfo::isDue(now.addSecs(-24 * 3600), now));
-        QVERIFY(UpdateInfo::isDue(now.addDays(-30), now));
-        QVERIFY(UpdateInfo::isDue(now.addSecs(3600), now));   // the clock was set back
+    void readsChecksumFiles() {
+        const QString good = QString(64, 'a');
+        const QString other = QString(64, 'B');
+        const QByteArray sums = QString("%1  coldhex-1.0.4-win64.exe\n%2 *coldhex_1.0.4_amd64.deb\n\ngarbage line\n%3  coldhex-1.0.4-win64.exe.sig\n")
+                                    .arg(good, other, QString(64, 'c')).toUtf8();
+        QCOMPARE(UpdateInfo::expectedChecksum(sums, "coldhex-1.0.4-win64.exe"), good);
+        QCOMPARE(UpdateInfo::expectedChecksum(sums, "coldhex_1.0.4_amd64.deb"), other.toLower());   // star mode, lowercased
+        QCOMPARE(UpdateInfo::expectedChecksum(sums, "coldhex-1.0.4-win64.zip"), QString());         // not listed
+        QCOMPARE(UpdateInfo::expectedChecksum(sums, "win64.exe"), QString());                       // no partial names
+        QCOMPARE(UpdateInfo::expectedChecksum("deadbeef  coldhex-1.0.4-win64.exe\n", "coldhex-1.0.4-win64.exe"), QString());  // too short
+        QCOMPARE(UpdateInfo::expectedChecksum(QByteArray(), "x"), QString());
+        // Windows line endings
+        QCOMPARE(UpdateInfo::expectedChecksum((good + "  a.exe\r\n").toUtf8(), "a.exe"), good);
+    }
+
+    void decidesWhenTheProgramCanReplaceItself() {
+        const ReleaseInfo r = UpdateInfo::parseRelease(release(), Platform::Windows);
+        QVERIFY(r.valid && !r.assetUrl.isEmpty() && !r.checksumUrl.isEmpty());
+        QVERIFY(UpdateInfo::canInstall(r, Platform::Windows, true));
+        QVERIFY(!UpdateInfo::canInstall(r, Platform::Windows, false));   // zip copy or a build of a developer
+        QVERIFY(!UpdateInfo::canInstall(r, Platform::Linux, true));
+        QVERIFY(!UpdateInfo::canInstall(ReleaseInfo(), Platform::Windows, true));
+
+        ReleaseInfo noSums = r;
+        noSums.checksumUrl.clear();
+        QVERIFY(!UpdateInfo::canInstall(noSums, Platform::Windows, true));   // nothing to check the download against
+
+        ReleaseInfo noSize = r;
+        noSize.assetSize = 0;
+        QVERIFY(!UpdateInfo::canInstall(noSize, Platform::Windows, true));
+
+        ReleaseInfo huge = r;
+        huge.assetSize = UpdateInfo::kMaxInstallerBytes + 1;
+        QVERIFY(!UpdateInfo::canInstall(huge, Platform::Windows, true));
+    }
+
+    void recognisesAnInstalledCopy() {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QVERIFY(QDir(dir.path()).mkpath("bin"));
+        const QString bin = QDir(dir.path()).filePath("bin");
+        QVERIFY(!UpdateInfo::isInstalledByInstaller(bin));
+        QFile uninstaller(QDir(dir.path()).filePath("unins000.exe"));
+        QVERIFY(uninstaller.open(QIODevice::WriteOnly));
+        uninstaller.close();
+        QVERIFY(UpdateInfo::isInstalledByInstaller(bin));
+    }
+
+    void startsTheInstallerSilentlyAndReopensColdHex() {
+        const QStringList args = UpdateInfo::installerArguments();
+        QVERIFY(args.contains("/SILENT"));
+        QVERIFY(args.contains("/NORESTART"));
+        QVERIFY(args.contains("/CLOSEAPPLICATIONS"));
+        QVERIFY(args.contains("/RELAUNCH"));
+        QVERIFY(!args.contains("/VERYSILENT"));
     }
 
     void keepsTheUpdateSettings() {
@@ -136,22 +186,24 @@ private slots:
             QSettings s(path, QSettings::IniFormat);
             const UpdateSettings fresh = UpdateSettings::load(s);
             QVERIFY(fresh.checkOnStartup);
-            QVERIFY(!fresh.lastCheck.isValid());
             QVERIFY(fresh.skippedVersion.isEmpty());
+            QVERIFY(fresh.etag.isEmpty());
+            QVERIFY(fresh.cachedRelease.isEmpty());
 
             UpdateSettings u;
             u.checkOnStartup = false;
-            u.lastCheck = utc("2026-10-24T12:30:15Z");
             u.skippedVersion = "1.0.1";
+            u.etag = "W/\"abc123\"";
+            u.cachedRelease = "{\"tag_name\":\"v1.0.1\"}";
             u.save(s);
         }
         QSettings s(path, QSettings::IniFormat);
         const UpdateSettings u = UpdateSettings::load(s);
         QVERIFY(!u.checkOnStartup);
-        QCOMPARE(u.lastCheck.toSecsSinceEpoch(), utc("2026-10-24T12:30:15Z").toSecsSinceEpoch());
         QCOMPARE(u.skippedVersion, QString("1.0.1"));
-    }
-};
+        QCOMPARE(u.etag, QString("W/\"abc123\""));
+        QCOMPARE(u.cachedRelease, QString("{\"tag_name\":\"v1.0.1\"}"));
+    }};
 
 QTEST_GUILESS_MAIN(TestUpdateInfo)
 #include "tst_updateinfo.moc"

@@ -159,6 +159,10 @@ jobs:
           path: packages
           merge-multiple: true
 
+      # ColdHex checks the installer it downloads against this file before it runs it.
+      - name: Checksums
+        run: cd packages && sha256sum coldhex* > SHA256SUMS.txt && cat SHA256SUMS.txt
+
       - uses: softprops/action-gh-release@v2
         with:
           files: packages/*

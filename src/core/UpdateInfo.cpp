@@ -1,4 +1,6 @@
 #include "UpdateInfo.h"
+#include <QDir>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -131,23 +133,45 @@ bool UpdateInfo::isNewer(const QString& latest, const QString& current) {
     return l.valid && c.valid && compareVersions(l, c) > 0;
 }
 
-bool UpdateInfo::isDue(const QDateTime& lastCheck, const QDateTime& now, int hours) {
-    if (!lastCheck.isValid()) return true;
-    if (lastCheck > now) return true;
-    return lastCheck.secsTo(now) >= static_cast<qint64>(hours) * 3600;
+QString UpdateInfo::expectedChecksum(const QByteArray& sumsFile, const QString& fileName) {
+    // Lines of `sha256sum`: "<64 hex digits>  name" or "<64 hex digits> *name".
+    static const QRegularExpression line(QStringLiteral("^([0-9A-Fa-f]{64}) [ *](.+)$"));
+    for (const QString& raw : QString::fromUtf8(sumsFile).split(QLatin1Char('\n'))) {
+        const QRegularExpressionMatch m = line.match(raw.trimmed());
+        if (m.hasMatch() && m.captured(2) == fileName) return m.captured(1).toLower();
+    }
+    return QString();
+}
+
+bool UpdateInfo::isInstalledByInstaller(const QString& appDirPath) {
+    // The program is in <install folder>/bin, the uninstaller in <install folder>.
+    return QFileInfo::exists(QDir(appDirPath).filePath(QStringLiteral("../unins000.exe")));
+}
+
+bool UpdateInfo::canInstall(const ReleaseInfo& release, Platform platform, bool installedByInstaller) {
+    return release.valid && platform == Platform::Windows && installedByInstaller
+        && !release.assetUrl.isEmpty() && !release.checksumUrl.isEmpty()
+        && release.assetSize > 0 && release.assetSize <= kMaxInstallerBytes;
+}
+
+QStringList UpdateInfo::installerArguments() {
+    return {QStringLiteral("/SILENT"), QStringLiteral("/SUPPRESSMSGBOXES"), QStringLiteral("/NORESTART"),
+            QStringLiteral("/CLOSEAPPLICATIONS"), QStringLiteral("/RELAUNCH")};
 }
 
 UpdateSettings UpdateSettings::load(QSettings& settings) {
     UpdateSettings s;
     s.checkOnStartup = settings.value("updates/checkOnStartup", true).toBool();
-    s.lastCheck = QDateTime::fromString(settings.value("updates/lastCheck").toString(), Qt::ISODate);
     s.skippedVersion = settings.value("updates/skippedVersion").toString();
+    s.etag = settings.value("updates/etag").toString();
+    s.cachedRelease = settings.value("updates/cachedRelease").toString();
     return s;
 }
 
 void UpdateSettings::save(QSettings& settings) const {
     settings.setValue("updates/checkOnStartup", checkOnStartup);
-    settings.setValue("updates/lastCheck", lastCheck.isValid() ? lastCheck.toString(Qt::ISODate) : QString());
     settings.setValue("updates/skippedVersion", skippedVersion);
+    settings.setValue("updates/etag", etag);
+    settings.setValue("updates/cachedRelease", cachedRelease);
     settings.sync();
 }

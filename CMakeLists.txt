@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(coldhex VERSION 1.0.3 LANGUAGES CXX)
+project(coldhex VERSION 1.0.4 LANGUAGES CXX)
 
 # Shown in the program and in the package names: empty for a stable release, "-beta1" for a pre-release.
 # The release tag must be v<version><suffix>, for example v1.0.0.
