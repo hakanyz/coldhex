@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QByteArray>
-#include <QDateTime>
 #include <QSettings>
 #include <QString>
 
@@ -49,14 +48,29 @@ public:
 
     static bool isNewer(const QString& latest, const QString& current);
 
-    // The check runs at most once a day (an unreadable or future time counts as due).
-    static bool isDue(const QDateTime& lastCheck, const QDateTime& now, int hours = 24);
+    // The SHA-256 of `fileName` (lowercase hex) from the text of a SHA256SUMS.txt file, empty when
+    // the file is not listed there or the line is malformed.
+    static QString expectedChecksum(const QByteArray& sumsFile, const QString& fileName);
+
+    // The installer replaces the running program only when it was put there by the Windows
+    // installer (which leaves its uninstaller next to the program folder) and the release carries
+    // the package and its checksum.
+    static bool isInstalledByInstaller(const QString& appDirPath);
+    static bool canInstall(const ReleaseInfo& release, Platform platform, bool installedByInstaller);
+
+    // What the installer is started with: silent, closing and reopening ColdHex.
+    static QStringList installerArguments();
+
+    static constexpr qint64 kMaxInstallerBytes = 300LL * 1024 * 1024;
 };
 
 struct UpdateSettings {
     bool checkOnStartup = true;
-    QDateTime lastCheck;
     QString skippedVersion;
+    // The last answer of GitHub and its tag, so that the next check can ask "has it changed?".
+    // An answer of "not changed" does not count against GitHub's limit on requests.
+    QString etag;
+    QString cachedRelease;
 
     static UpdateSettings load(QSettings& settings);
     void save(QSettings& settings) const;
