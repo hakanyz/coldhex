@@ -19,23 +19,46 @@ every other chip supported by [probe-rs](https://probe.rs), in one window.
 
 - **Wide chip support** – search more than 4,000 chips while you type; the manufacturer box follows
   your selection. Geehy APM32 (F0, F1, F4) is bundled; other CMSIS-Pack chips can be added.
-- **Two firmware slots** – flash a bootloader and an application in one run, each with its own start
-  address. Overlaps between the slots and writes outside the chip's flash are refused.
+- **Two firmware files** – File 1 and File 2, each with its own start address. Under *Data Source* you
+  choose what Program and Verify write: File 1, File 2 or both (a bootloader and an application in one
+  run, or the files of two different boards). Overlaps between the two files and writes outside the
+  chip's flash are refused. When a file is rebuilt on disk, ColdHex reloads it and marks it *Updated*
+  until it has been programmed.
 - **Firmware formats** – Intel HEX (checksums are validated), raw binary with a start address, and ELF.
   Drag and drop files onto the window.
+- **Profiles** – save the chip, interface, speed, options, firmware files and data source under a
+  name and switch between boards with one click; profiles can be exported to and imported from a JSON
+  file (File menu).
 - **Full workflow** – Connect, Erase, Program, Verify, Read the flash (it is shown in the memory
   viewer; Save writes it to a file), Reset, and Stop a running operation. Erase / verify / reset
-  after programming are optional.
+  after programming are optional. The status bar shows the running operation with a progress bar
+  (a real percentage with the packaged `coldhex-flash` helper) and the time it took.
 - **Read-out protection** – after connecting, ColdHex shows whether the chip is read-protected (level
   1) and offers to remove it; Lock and Unlock buttons set and clear level 1. Level 2 is never
   written. Chip families without a known method have the buttons greyed out, with the reason in the
   tooltip.
 - **Reliable connections** – SWD or JTAG, adjustable speed, *connect under reset*, and an automatic
   speed reduction that resumes the sequence at the step that failed.
+- **Probes** – probes are found as you plug them in (Tools > Refresh Probes looks again on demand), and
+  the console tells the model of a new probe and the voltage of the target. When a connection fails,
+  ColdHex says in plain words what is probably wrong (wiring or power of the board, a wrong USB
+  driver, a probe used by another program, an unknown chip name, a read-protected chip) and what to
+  do. Help > Wiring Guide shows how to connect the probe.
 - **System Check** – on start-up ColdHex looks for probe-rs, connected probes and their drivers and
   tells you what is missing and how to fix it (Help > System Check).
 - **Memory viewer** – inspect a HEX/BIN/ELF file or the data read back from the chip.
-- **Update notice** – once a day at start-up ColdHex asks GitHub whether a newer release exists and tells you; it installs nothing by itself (Help > Check for Updates, and Check for Updates at Startup to turn it off).
+- **Console** – everything ColdHex does is logged there. Edit > Save Log... writes it to a file,
+  Edit > Clear Console (Ctrl+L) empties it, and the View menu shows or hides the panels. It can be
+  minimized or closed and opens again when something happens.
+- **Remembers your setup** – the target settings, the firmware files and the window size come back
+  at the next start.
+- **Updates** – at every start ColdHex asks GitHub whether a newer release exists (Help > Check for
+  Updates does it on demand). **Download & Install** downloads the installer, checks it against the
+  `SHA256SUMS.txt` of the release, closes ColdHex, installs and opens the new version. Remind Me Later
+  asks again at the next start, Skip This Version stays quiet until a newer one is out. The system
+  proxy settings are used (company networks). Only a copy put
+  there by the Windows installer replaces itself; a copy from the zip file or on Linux gets the link to
+  the release.
 - **Self-contained packages** – probe-rs is included, and so are the Qt libraries on Windows (on Ubuntu apt installs them); nothing else to install
   apart from the probe driver on Windows.
 
@@ -52,6 +75,9 @@ Download the package for your system from the
 | Linux (64-bit) | `coldhex-<version>-Linux.tar.gz` | Unpack, start `usr/bin/coldhex` (needs the Qt 6 libraries) |
 
 ColdHex is 64-bit only: there are no packages for 32-bit Windows or for ARM.
+
+The Windows installer is not code-signed, so Windows SmartScreen may warn when you run it for the first
+time (More info > Run anyway). Every release has a `SHA256SUMS.txt` to check the downloaded files.
 
 Versions up to 1.0.1 were installed for all users into Program Files. The newer installer does not replace that copy but offers to remove it; your profiles and settings are kept.
 
@@ -123,9 +149,12 @@ cmake --build build
 cd build && cpack
 ```
 
-CPack creates `.zip` and `.exe` on Windows and `.deb` and `.tar.gz` on Linux. The workflow in
-`.github/workflows/build.yml` does this for every push; tags that start with `v` are published as
-GitHub releases (a tag with a dash, such as `v0.1.0-beta1`, as a pre-release).
+CPack creates the `.zip` on Windows and the `.deb` and `.tar.gz` on Linux. The Windows installer is made
+with [Inno Setup](https://jrsoftware.org/isinfo.php) from `packaging/windows/coldhex.iss` (see the
+workflow). The workflow in `.github/workflows/build.yml` builds on every push to `main` and `develop`
+(not when only text files change); tags that start with `v` are published as GitHub releases together
+with a `SHA256SUMS.txt` (a tag with a dash, such as `v1.1.0-beta1`, as a pre-release). The version
+number is set in `CMakeLists.txt` and the tag must be `v` plus that number.
 
 ## Project layout
 
@@ -137,7 +166,7 @@ src/
 └── engine/     Engine interface, probe-rs driver, system check
 tests/          Unit tests (Qt Test) with a mock engine
 resources/      Icons, style sheet, bundled chip descriptions
-packaging/      Linux package files, third-party notices
+packaging/      Windows installer script, Linux package files, third-party notices
 docs/           Demo GIF for this README
 ```
 
