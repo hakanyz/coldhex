@@ -6,6 +6,8 @@
 #include "ProfileCombo.h"
 #include "Updater.h"
 #include <QDesktopServices>
+#include <QProcess>
+#include <QProgressDialog>
 #include "ProfileTransferDialog.h"
 #include "core/ProfileTransfer.h"
 #include <QSaveFile>
@@ -637,7 +639,6 @@ void MainWindow::setupUpdates() {
     m_updater = new Updater(this);
     connect(m_updater, &Updater::updateAvailable, this, &MainWindow::onUpdateAvailable);
     connect(m_updater, &Updater::upToDate, this, [this](bool manual) {
-        rememberUpdateCheck();
         if (manual) {
             QMessageBox box(QMessageBox::Information, "Check for Updates",
                             QString("You have the latest version of ColdHex (%1).").arg(QApplication::applicationVersion()),
@@ -660,11 +661,11 @@ void MainWindow::setupUpdates() {
     ui->menuHelp->insertAction(ui->actionAbout, checkNow);
     ui->menuHelp->insertSeparator(ui->actionAbout);
 
-    // Once a day at most, a few seconds after the window is up.
+    // At every start, a few seconds after the window is up. GitHub answers "not changed" without counting
+    // it against its limit, so asking every time is free, and a new release is noticed at once.
     QTimer::singleShot(3000, this, [this]() {
         QSettings settings;
-        const UpdateSettings u = UpdateSettings::load(settings);
-        if (u.checkOnStartup && UpdateInfo::isDue(u.lastCheck, QDateTime::currentDateTimeUtc())) m_updater->check(false);
+        if (UpdateSettings::load(settings).checkOnStartup) m_updater->check(false);
     });
 }
 
@@ -684,19 +685,9 @@ void MainWindow::saveStartupCheck(bool on) {
     u.save(settings);
 }
 
-void MainWindow::rememberUpdateCheck() {
-    QSettings settings;
-    UpdateSettings u = UpdateSettings::load(settings);
-    u.lastCheck = QDateTime::currentDateTimeUtc();
-    u.save(settings);
-}
-
 void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
-    rememberUpdateCheck();
-
     QSettings settings;
-    UpdateSettings u = UpdateSettings::load(settings);
-    if (!manual && release.version == u.skippedVersion) return;
+    if (!manual && release.version == UpdateSettings::load(settings).skippedVersion) return;
 
     // Never open a window in the middle of programming or reading a chip.
     if (m_isOperationRunning || m_engine->isBusy()) {
@@ -704,24 +695,79 @@ void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
         return;
     }
 
+    // ColdHex replaces itself only when it was installed by the installer; a copy unpacked from the
+    // zip file is not touched, it only gets the link to the release.
+    const bool canInstall = UpdateInfo::canInstall(release, currentPlatform(),
+                                                   UpdateInfo::isInstalledByInstaller(QCoreApplication::applicationDirPath()));
+
     QMessageBox box(QMessageBox::Information, "Update Available",
                     QString("ColdHex %1 is available. You are using %2.").arg(release.version, QApplication::applicationVersion()),
                     QMessageBox::NoButton, this);
     if (!release.notes.trimmed().isEmpty()) box.setDetailedText(release.notes.trimmed());
+    QPushButton* install = canInstall ? box.addButton("Download && Install", QMessageBox::AcceptRole) : nullptr;
     QPushButton* view = box.addButton("View Release", QMessageBox::AcceptRole);
     box.addButton("Remind Me Later", QMessageBox::RejectRole);
     QPushButton* skip = box.addButton("Skip This Version", QMessageBox::DestructiveRole);
+    if (install) box.setDefaultButton(install);
     QCheckBox* startup = makeStartupCheckBox(&box);
     box.setCheckBox(startup);
     box.exec();
     saveStartupCheck(startup->isChecked());
 
-    if (box.clickedButton() == view && !release.pageUrl.isEmpty()) {
+    if (install && box.clickedButton() == install) {
+        downloadAndInstall(release);
+    } else if (box.clickedButton() == view && !release.pageUrl.isEmpty()) {
         QDesktopServices::openUrl(QUrl(release.pageUrl));
     } else if (box.clickedButton() == skip) {
+        UpdateSettings u = UpdateSettings::load(settings);  // as it is now, the box may have changed the start-up option
         u.skippedVersion = release.version;
         u.save(settings);
     }
+}
+
+// Downloads the installer (checked against the checksum of the release), then installs it.
+void MainWindow::downloadAndInstall(const ReleaseInfo& release) {
+    auto* progress = new QProgressDialog(QString("Downloading ColdHex %1...").arg(release.version), "Cancel", 0, 100, this);
+    progress->setWindowTitle("Update ColdHex");
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
+    progress->setValue(0);
+
+    connect(progress, &QProgressDialog::canceled, m_updater, &Updater::cancelDownload);
+    connect(progress, &QProgressDialog::canceled, progress, &QObject::deleteLater);
+    connect(m_updater, &Updater::downloadProgress, progress, [progress](qint64 received, qint64 total) {
+        if (total > 0) progress->setValue(static_cast<int>(100 * received / total));
+    });
+    connect(m_updater, &Updater::downloadFailed, progress, [this, progress](const QString& reason) {
+        progress->close();
+        progress->deleteLater();
+        QMessageBox::warning(this, "Update ColdHex",
+                             QString("The update could not be installed:\n%1\n\nYou can download it from the release page instead (Help > Check for Updates > View Release).").arg(reason));
+    });
+    connect(m_updater, &Updater::downloadFinished, progress, [this, progress, release](const QString& path) {
+        progress->close();
+        progress->deleteLater();
+        installUpdate(path, release);
+    });
+    m_updater->download(release);
+}
+
+void MainWindow::installUpdate(const QString& installerPath, const ReleaseInfo& release) {
+    // The download took a while: something may have been started in the meantime.
+    if (m_isOperationRunning || m_engine->isBusy()) {
+        QMessageBox::information(this, "Update ColdHex",
+            QString("ColdHex %1 was downloaded and checked, but an operation is running now. Finish it, then use Help > Check for Updates.").arg(release.version));
+        return;
+    }
+
+    appendLog("INFO", QString("Installing ColdHex %1: ColdHex closes and opens again.").arg(release.version));
+    if (!QProcess::startDetached(installerPath, UpdateInfo::installerArguments())) {
+        QMessageBox::warning(this, "Update ColdHex", "The installer could not be started.");
+        return;
+    }
+    close();  // saves the settings; the installer waits for ColdHex to end and starts the new version
 }
 void MainWindow::exportProfiles() {
     QSettings settings;

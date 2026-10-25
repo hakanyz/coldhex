@@ -127,7 +127,8 @@ private:
     void startSetupCheck();
     void onSetupChecked(const QString& probeRsPath, const SystemCheck::Input& input);
     void setupUpdates();
-    void rememberUpdateCheck();
+    void downloadAndInstall(const ReleaseInfo& release);
+    void installUpdate(const QString& installerPath, const ReleaseInfo& release);
     QCheckBox* makeStartupCheckBox(QWidget* parent);
     void saveStartupCheck(bool on);
     void onUpdateAvailable(const ReleaseInfo& release, bool manual);
