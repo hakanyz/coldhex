@@ -639,22 +639,14 @@ void MainWindow::setupUpdates() {
     m_updater = new Updater(this);
     connect(m_updater, &Updater::updateAvailable, this, &MainWindow::onUpdateAvailable);
     connect(m_updater, &Updater::upToDate, this, [this](bool manual) {
-        if (manual) {
-            QMessageBox box(QMessageBox::Information, "Check for Updates",
-                            QString("You have the latest version of ColdHex (%1).").arg(QApplication::applicationVersion()),
-                            QMessageBox::Ok, this);
-            QCheckBox* startup = makeStartupCheckBox(&box);
-            box.setCheckBox(startup);
-            box.exec();
-            saveStartupCheck(startup->isChecked());
-        }
+        if (manual) QMessageBox::information(this, "Up to Date", "You are using the latest version of ColdHex.");
     });
     connect(m_updater, &Updater::failed, this, [this](const QString& reason, bool manual) {
         // A check at start-up stays quiet: no internet, or a blocked network, is nothing to report.
-        if (manual) QMessageBox::warning(this, "Check for Updates", QString("Could not check for updates:\n%1").arg(reason));
+        if (manual) QMessageBox::warning(this, "Update Error", "Failed to check for updates:\n" + reason);
     });
 
-    auto* checkNow = new QAction("Check for Updates...", this);
+    auto* checkNow = new QAction("Check for Updates", this);
     connect(checkNow, &QAction::triggered, this, [this]() { m_updater->check(true); });
 
     ui->menuHelp->insertSeparator(ui->actionAbout);
@@ -667,22 +659,6 @@ void MainWindow::setupUpdates() {
         QSettings settings;
         if (UpdateSettings::load(settings).checkOnStartup) m_updater->check(false);
     });
-}
-
-// The start-up check can be switched off here, in the windows that report on updates.
-QCheckBox* MainWindow::makeStartupCheckBox(QWidget* parent) {
-    auto* box = new QCheckBox("Check for updates at startup", parent);
-    QSettings settings;
-    box->setChecked(UpdateSettings::load(settings).checkOnStartup);
-    return box;
-}
-
-void MainWindow::saveStartupCheck(bool on) {
-    QSettings settings;
-    UpdateSettings u = UpdateSettings::load(settings);
-    if (u.checkOnStartup == on) return;
-    u.checkOnStartup = on;
-    u.save(settings);
 }
 
 void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
@@ -700,35 +676,33 @@ void MainWindow::onUpdateAvailable(const ReleaseInfo& release, bool manual) {
     const bool canInstall = UpdateInfo::canInstall(release, currentPlatform(),
                                                    UpdateInfo::isInstalledByInstaller(QCoreApplication::applicationDirPath()));
 
-    QMessageBox box(QMessageBox::Information, "Update Available",
-                    QString("ColdHex %1 is available. You are using %2.").arg(release.version, QApplication::applicationVersion()),
-                    QMessageBox::NoButton, this);
-    if (!release.notes.trimmed().isEmpty()) box.setDetailedText(release.notes.trimmed());
-    QPushButton* install = canInstall ? box.addButton("Download && Install", QMessageBox::AcceptRole) : nullptr;
-    QPushButton* view = box.addButton("View Release", QMessageBox::AcceptRole);
+    QMessageBox box(this);
+    box.setWindowTitle("Update Available");
+    box.setText(QString("A new version of ColdHex (%1) is available!\n\nWould you like to download it now?").arg(release.tag));
+
+    // A copy that cannot replace itself (unpacked from the zip file) gets the release page instead.
+    QPushButton* install = box.addButton(canInstall ? "Download && Install" : "View Release", QMessageBox::AcceptRole);
     box.addButton("Remind Me Later", QMessageBox::RejectRole);
     QPushButton* skip = box.addButton("Skip This Version", QMessageBox::DestructiveRole);
-    if (install) box.setDefaultButton(install);
-    QCheckBox* startup = makeStartupCheckBox(&box);
-    box.setCheckBox(startup);
     box.exec();
-    saveStartupCheck(startup->isChecked());
 
-    if (install && box.clickedButton() == install) {
-        downloadAndInstall(release);
-    } else if (box.clickedButton() == view && !release.pageUrl.isEmpty()) {
-        QDesktopServices::openUrl(QUrl(release.pageUrl));
+    if (box.clickedButton() == install) {
+        if (canInstall) {
+            downloadAndInstall(release);
+        } else if (!release.pageUrl.isEmpty()) {
+            QDesktopServices::openUrl(QUrl(release.pageUrl));
+        }
     } else if (box.clickedButton() == skip) {
-        UpdateSettings u = UpdateSettings::load(settings);  // as it is now, the box may have changed the start-up option
+        UpdateSettings u = UpdateSettings::load(settings);
         u.skippedVersion = release.version;
         u.save(settings);
     }
+    // "Remind Me Later" does nothing, it will ask again at the next start.
 }
-
 // Downloads the installer (checked against the checksum of the release), then installs it.
 void MainWindow::downloadAndInstall(const ReleaseInfo& release) {
-    auto* progress = new QProgressDialog(QString("Downloading ColdHex %1...").arg(release.version), "Cancel", 0, 100, this);
-    progress->setWindowTitle("Update ColdHex");
+    auto* progress = new QProgressDialog("Downloading update...", "Cancel", 0, 100, this);
+    progress->setWindowTitle("ColdHex Updater");
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);
     progress->setAutoClose(false);
@@ -743,8 +717,7 @@ void MainWindow::downloadAndInstall(const ReleaseInfo& release) {
     connect(m_updater, &Updater::downloadFailed, progress, [this, progress](const QString& reason) {
         progress->close();
         progress->deleteLater();
-        QMessageBox::warning(this, "Update ColdHex",
-                             QString("The update could not be installed:\n%1\n\nYou can download it from the release page instead (Help > Check for Updates > View Release).").arg(reason));
+        QMessageBox::warning(this, "Update Error", "Failed to download update:\n" + reason);
     });
     connect(m_updater, &Updater::downloadFinished, progress, [this, progress, release](const QString& path) {
         progress->close();
