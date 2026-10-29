@@ -30,6 +30,7 @@ JLinkEngine::JLinkEngine(const QString& commanderPath, IProgrammerEngine* chipDa
       m_commander(commanderPath),
       m_chipData(chipData),
       m_process(new QProcess(this)),
+      m_pingProcess(new QProcess(this)),
       m_progressTimer(new QTimer(this))
 {
     m_process->setProcessChannelMode(QProcess::MergedChannels);  // the Commander writes to both
@@ -37,11 +38,16 @@ JLinkEngine::JLinkEngine(const QString& commanderPath, IProgrammerEngine* chipDa
             this, &JLinkEngine::onFinished);
     connect(m_process, &QProcess::errorOccurred, this, &JLinkEngine::onErrorOccurred);
 
+    m_pingProcess->setProcessChannelMode(QProcess::MergedChannels);
+    connect(m_pingProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &JLinkEngine::onPingFinished);
+
     m_progressTimer->setInterval(200);
     connect(m_progressTimer, &QTimer::timeout, this, &JLinkEngine::onProgressTick);
 }
 
 JLinkEngine::~JLinkEngine() {
+    stopPing();
     if (m_process->state() != QProcess::NotRunning) {
         m_process->kill();
         m_process->waitForFinished(1000);
@@ -56,6 +62,7 @@ void JLinkEngine::configureTarget(const TargetSettings& settings) {
     m_target = settings;
 
     if (targetChanged && m_connected && !isBusy()) {
+        stopPing();
         m_connected = false;
         emit disconnected();
     }
@@ -66,6 +73,7 @@ ChipMemoryMap JLinkEngine::queryMemoryMap(const QString& chipName, const QString
 }
 
 bool JLinkEngine::run(const QString& script, State state, const QString& action) {
+    stopPing();
     if (!m_scratch.isValid()) {
         emit logMessage("Cannot create a temporary folder for the J-Link script.", EngineLogLevel::Error);
         QTimer::singleShot(0, this, [this]() { emit operationFinished(false, "No temporary folder."); });
@@ -120,6 +128,7 @@ bool JLinkEngine::connectTarget(const QString& chipName, uint32_t speedKhz, cons
     if (const MemoryRegion* region = m_chipData->queryMemoryMap(chipName, m_target.chipDescriptionPath).firstRam()) {
         ram = region->start;
     }
+    m_ramAddress = ram;
     if (m_target.connectUnderReset) {
         emit logMessage("Connect under reset is not supported with the J-Link engine yet and is ignored.",
                         EngineLogLevel::Warning);
@@ -131,10 +140,34 @@ bool JLinkEngine::connectTarget(const QString& chipName, uint32_t speedKhz, cons
 }
 
 void JLinkEngine::disconnectTarget() {
+    stopPing();
     if (isBusy()) cancelCurrentOperation();
     m_connected = false;
     emit disconnected();
     emit logMessage("Target disconnected.", EngineLogLevel::Info);
+}
+
+void JLinkEngine::checkTargetConnection() {
+    if (!m_connected || isBusy() || !m_scratch.isValid()) return;
+    if (m_pingProcess->state() != QProcess::NotRunning) return;
+
+    const QString scriptFile = m_scratch.filePath("ping.jlink");
+    QFile file(scriptFile);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) return;
+    file.write(JLinkCommands::connectScript(m_ramAddress, false).toUtf8());
+    file.close();
+
+    m_pingIgnoreResult = false;
+    m_pingProcess->start(m_commander, JLinkCommands::arguments(m_target, scriptFile));
+}
+
+void JLinkEngine::stopPing() {
+    if (m_pingProcess && m_pingProcess->state() != QProcess::NotRunning) {
+        m_pingIgnoreResult = true;
+        m_pingProcess->kill();
+        m_pingProcess->waitForFinished(500);
+        m_pingIgnoreResult = false;
+    }
 }
 
 void JLinkEngine::eraseTarget(bool) {
@@ -435,6 +468,9 @@ void JLinkEngine::onFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     if (done == State::Connecting) {
         m_connected = outcome.ok;
         emit connected(outcome.ok, outcome.ok ? m_target.chipName : advice);
+    } else if (!outcome.ok && m_connected) {
+        m_connected = false;
+        emit disconnected();
     }
 
     const QString message = outcome.ok
@@ -445,6 +481,17 @@ void JLinkEngine::onFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     emit operationFinished(outcome.ok, message);
 }
 
+void JLinkEngine::onPingFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    const QString output = QString::fromLocal8Bit(m_pingProcess->readAll());
+    if (m_pingIgnoreResult || !m_connected || isBusy()) return;
+    const JLinkCommands::Outcome outcome = JLinkCommands::analyze(exitCode, output);
+    if (exitStatus == QProcess::NormalExit && outcome.ok) return;
+
+    m_connected = false;
+    emit logMessage("The target no longer answers. The connection is closed.", EngineLogLevel::Warning);
+    emit disconnected();
+}
+
 void JLinkEngine::onErrorOccurred(QProcess::ProcessError error) {
     if (error != QProcess::FailedToStart) return;
 
@@ -453,5 +500,9 @@ void JLinkEngine::onErrorOccurred(QProcess::ProcessError error) {
     clearReadJob();
     const QString message = QString("Failed to start '%1'. Is SEGGER's J-Link software installed?").arg(m_commander);
     emit logMessage(message, EngineLogLevel::Error);
+    if (m_connected) {
+        m_connected = false;
+        emit disconnected();
+    }
     emit operationFinished(false, message);
 }

@@ -29,6 +29,7 @@ public:
     void disconnectTarget() override { m_connected = false; }
     bool isConnected() const override { return m_connected; }
     bool isBusy() const override { return m_busy; }
+    void checkTargetConnection() override { commands << "checkTarget"; }
 
     void eraseTarget(bool) override { commands << "erase"; m_busy = true; }
     void unlockTarget() override { commands << "unlock"; m_busy = true; }

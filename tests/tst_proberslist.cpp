@@ -69,6 +69,24 @@ private slots:
         QCOMPARE(args.at(i + 1), QString("C:/chips/apm32.yaml"));
     }
 
+    void pingArgumentsNeverAssertReset() {
+        TargetSettings t;
+        t.chipName = "STM32F407VG";
+        t.speedKhz = 1000;
+        t.probeId = "0483:3748";
+        t.connectUnderReset = true;
+
+        const QStringList ramArgs = ProbeRsEngine::pingArgsFor(t, 0x20000000, true);
+        QCOMPARE(ramArgs.first(), QString("read"));
+        QVERIFY(!ramArgs.contains("--connect-under-reset"));
+        QVERIFY(ramArgs.contains("b32"));
+        QVERIFY(ramArgs.contains("0x20000000"));
+
+        const QStringList infoArgs = ProbeRsEngine::pingArgsFor(t, 0, false);
+        QCOMPARE(infoArgs.first(), QString("info"));
+        QVERIFY(!infoArgs.contains("--connect-under-reset"));
+    }
+
     void helperArgumentsSelectChipProbeProtocolAndSpeed() {
         TargetSettings t;
         t.chipName = "STM32F407VG";

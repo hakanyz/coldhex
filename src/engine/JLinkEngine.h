@@ -25,6 +25,7 @@ public:
     void disconnectTarget() override;
     bool isConnected() const override { return m_connected; }
     bool isBusy() const override { return m_state != State::Idle; }
+    void checkTargetConnection() override;
 
     void eraseTarget(bool fullErase = true) override;
     void unlockTarget() override;
@@ -46,12 +47,14 @@ private slots:
     void onFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onErrorOccurred(QProcess::ProcessError error);
     void onProgressTick();
+    void onPingFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
     enum class State { Idle, Connecting, Erasing, Programming, Verifying, Reading, Resetting };
 
     // Writes the script, starts the Commander and reports the start.
     bool run(const QString& script, State state, const QString& action);
+    void stopPing();
     bool joinReadParts(QString* error);
     void clearReadJob();
     void startReadingParts(uint64_t address, uint64_t byteCount, State state, const QString& action);
@@ -61,6 +64,7 @@ private:
     QString m_commander;
     IProgrammerEngine* m_chipData;
     QProcess* m_process;
+    QProcess* m_pingProcess;
     QTimer* m_progressTimer;
     QTemporaryDir m_scratch;  // scripts and the pieces of a read
 
@@ -68,6 +72,8 @@ private:
     State m_state = State::Idle;
     bool m_connected = false;
     bool m_cancelRequested = false;
+    bool m_pingIgnoreResult = false;
+    uint64_t m_ramAddress = 0x20000000;
     QString m_action;
 
     // The running read: the pieces the Commander writes and where they are joined.

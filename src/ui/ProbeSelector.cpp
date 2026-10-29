@@ -56,7 +56,7 @@ ProbeSelector::ProbeSelector(QWidget* window, QComboBox* probeBox, IProgrammerEn
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &ProbeSelector::onTimer);
 #ifdef Q_OS_WIN
-    m_timer->start(5000);
+    m_timer->start(2000);
 #else
     m_timer->start(1000);
 #endif
@@ -101,13 +101,23 @@ bool ProbeSelector::eventFilter(QObject* watched, QEvent* event) {
 // its driver may not be ready yet.
 void ProbeSelector::scheduleRefresh() {
     auto refreshIfIdle = [this]() {
-        if (!m_isBusy()) m_engine->requestProbeList();
+        if (m_isBusy()) {
+            m_refreshPending = true;
+            return;
+        }
+        m_refreshPending = false;
+        m_engine->requestProbeList();
     };
     QTimer::singleShot(300, this, refreshIfIdle);
     QTimer::singleShot(1500, this, refreshIfIdle);
 }
 
 void ProbeSelector::onTimer() {
+    if (m_refreshPending && !m_isBusy()) {
+        m_refreshPending = false;
+        m_engine->requestProbeList();
+        return;
+    }
 #ifndef Q_OS_WIN
     const QList<UsbDevice> seen = UsbScanner::scan();
     QStringList keys;

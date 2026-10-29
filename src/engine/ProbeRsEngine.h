@@ -30,6 +30,7 @@ public:
     void disconnectTarget() override;
     bool isConnected() const override;
     bool isBusy() const override;
+    void checkTargetConnection() override;
 
     void eraseTarget(bool fullErase = true) override;
     void unlockTarget() override;
@@ -46,6 +47,9 @@ public:
 
     // The arguments that select chip, probe, protocol and speed for every probe-rs command.
     static QStringList targetArgsFor(const TargetSettings& target);
+
+    // The arguments for a quiet background check of the connected target (never asserts reset).
+    static QStringList pingArgsFor(const TargetSettings& target, uint64_t ramAddress, bool hasRamAddress);
 
     // True while the probe a connection was made with is still in the list of probes. An empty
     // `connectedSelector` means "whichever probe probe-rs picked", so any probe will do.
@@ -89,10 +93,13 @@ private slots:
     void onProbeListErrorOccurred(QProcess::ProcessError error);
     void onProtectionFinished();
     void onCapabilitiesFinished();
+    void onPingFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
     void runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription,
                     bool useHelper = false);
+    void stopPing();
+    void stopBackgroundProbeTasks();
     void parseOutputLine(const QString& line, bool isError);
     QStringList targetArgs() const;
     static QStringList imageFormatArgs(const QString& filePath, uint32_t baseAddress);
@@ -105,11 +112,15 @@ private:
     QProcess* m_probeListProcess = nullptr;
     QProcess* m_protectionProcess = nullptr;  // reads the protection level once after a connect
     QProcess* m_capabilitiesProcess = nullptr;
+    QProcess* m_pingProcess = nullptr;        // checks quietly whether the connected target still answers
     QString m_capabilitiesChip;
     QByteArray m_protectionOutput;
     EngineState m_state = EngineState::Idle;
     bool m_connected = false;
     bool m_cancelRequested = false;
+    bool m_pingIgnoreResult = false;
+    uint64_t m_ramAddress = 0;
+    bool m_hasRamAddress = false;
     QByteArray m_stdoutBuffer;
     QByteArray m_stderrBuffer;
     QStringList m_outputLines;  // output of the running command, used to explain failures
