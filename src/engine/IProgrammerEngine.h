@@ -64,6 +64,9 @@ public:
     virtual void disconnectTarget() = 0;
     virtual bool isConnected() const = 0;
     virtual bool isBusy() const = 0;
+    // Checks quietly in the background whether the connected target still answers. If it does
+    // not, the connection is closed and disconnected() is emitted.
+    virtual void checkTargetConnection() {}
 
     virtual void eraseTarget(bool fullErase = true) = 0;
     // Removes the read-out protection (level 1). The chip erases its whole flash while it does so.

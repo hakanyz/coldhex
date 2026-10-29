@@ -19,6 +19,7 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
       m_probeListProcess(new QProcess(this)),
       m_protectionProcess(new QProcess(this)),
       m_capabilitiesProcess(new QProcess(this)),
+      m_pingProcess(new QProcess(this)),
       m_progressRegex(QStringLiteral(R"((\d+)\s*%)"))
 {
     connect(m_process, &QProcess::readyReadStandardOutput, this, &ProbeRsEngine::onProcessReadyReadStdOut);
@@ -37,6 +38,8 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
             this, [this]() { onProtectionFinished(); });
     connect(m_capabilitiesProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this]() { onCapabilitiesFinished(); });
+    connect(m_pingProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &ProbeRsEngine::onPingFinished);
 
     // Prefer a probe-rs shipped with ColdHex, then PATH, then the installer's default folder.
     const QString found = ProbeRsLocator::find(QCoreApplication::applicationDirPath(), QDir::homePath());
@@ -45,6 +48,11 @@ ProbeRsEngine::ProbeRsEngine(QObject* parent)
 }
 
 ProbeRsEngine::~ProbeRsEngine() {
+    stopPing();
+    if (m_protectionProcess && m_protectionProcess->state() != QProcess::NotRunning) {
+        m_protectionProcess->kill();
+        m_protectionProcess->waitForFinished(500);
+    }
     if (m_process && m_process->state() != QProcess::NotRunning) {
         m_process->kill();
         m_process->waitForFinished(1000);
@@ -85,6 +93,7 @@ void ProbeRsEngine::configureTarget(const TargetSettings& settings) {
     m_target = settings;
 
     if (targetChanged && m_connected && !isBusy()) {
+        stopPing();
         m_connected = false;
         emit disconnected();
     }
@@ -112,6 +121,16 @@ QStringList ProbeRsEngine::targetArgsFor(const TargetSettings& target) {
         args << "--connect-under-reset";
     }
     return args;
+}
+
+QStringList ProbeRsEngine::pingArgsFor(const TargetSettings& target, uint64_t ramAddress, bool hasRamAddress) {
+    TargetSettings pingTarget = target;
+    pingTarget.connectUnderReset = false;
+    if (hasRamAddress) {
+        return QStringList{"read"} + targetArgsFor(pingTarget)
+               + QStringList{"b32", QString("0x%1").arg(ramAddress, 8, 16, QLatin1Char('0')), "1"};
+    }
+    return QStringList{"info"} + targetArgsFor(pingTarget);
 }
 
 bool ProbeRsEngine::probeStillListed(const QString& connectedSelector, const QStringList& listedSelectors) {
@@ -185,9 +204,12 @@ bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, co
     QStringList args;
     const ChipMemoryMap memory = queryMemoryMap(chipName, m_target.chipDescriptionPath);
     if (const MemoryRegion* ram = memory.firstRam()) {
+        m_ramAddress = ram->start;
+        m_hasRamAddress = true;
         args = QStringList{"read"} + targetArgs()
                + QStringList{"b32", QString("0x%1").arg(ram->start, 8, 16, QLatin1Char('0')), "1"};
     } else {
+        m_hasRamAddress = false;
         args = QStringList{"info"} + targetArgs();
     }
     runCommand(args, EngineState::Connecting, QString("Connecting to target: %1 (%2 kHz)").arg(chipName).arg(speedKhz));
@@ -195,12 +217,43 @@ bool ProbeRsEngine::connectTarget(const QString& chipName, uint32_t speedKhz, co
 }
 
 void ProbeRsEngine::disconnectTarget() {
+    stopPing();
     if (isBusy()) {
         cancelCurrentOperation();
     }
     m_connected = false;
     emit disconnected();
     emit logMessage("Target disconnected.", EngineLogLevel::Info);
+}
+
+void ProbeRsEngine::checkTargetConnection() {
+    if (!m_connected || isBusy()) return;
+    if (m_pingProcess->state() != QProcess::NotRunning) return;
+    if (m_protectionProcess->state() != QProcess::NotRunning) return;
+    if (m_probeListProcess->state() != QProcess::NotRunning) return;
+
+    m_pingIgnoreResult = false;
+    m_pingProcess->start(m_executablePath, pingArgsFor(m_target, m_ramAddress, m_hasRamAddress));
+}
+
+void ProbeRsEngine::stopPing() {
+    if (m_pingProcess && m_pingProcess->state() != QProcess::NotRunning) {
+        m_pingIgnoreResult = true;
+        m_pingProcess->kill();
+        m_pingProcess->waitForFinished(500);
+        m_pingIgnoreResult = false;
+    }
+}
+
+void ProbeRsEngine::stopBackgroundProbeTasks() {
+    stopPing();
+    if (m_protectionProcess && m_protectionProcess->state() != QProcess::NotRunning) {
+        m_protectionProcess->kill();
+        m_protectionProcess->waitForFinished(500);
+    }
+    if (m_probeListProcess && m_probeListProcess->state() != QProcess::NotRunning) {
+        m_probeListProcess->waitForFinished(500);
+    }
 }
 
 void ProbeRsEngine::eraseTarget(bool fullErase) {
@@ -365,7 +418,10 @@ QList<ProbeInfo> ProbeRsEngine::parseProbeList(const QString& output) {
 }
 
 void ProbeRsEngine::requestProbeList() {
+    if (isBusy()) return;
+    if (m_protectionProcess->state() != QProcess::NotRunning) return;
     if (m_probeListProcess->state() != QProcess::NotRunning) return;
+    stopPing();
     m_probeListProcess->start(m_executablePath, {"list"});
 }
 
@@ -387,6 +443,7 @@ void ProbeRsEngine::onProbeListErrorOccurred(QProcess::ProcessError error) {
 
 void ProbeRsEngine::runCommand(const QStringList& args, EngineState targetState, const QString& actionDescription,
                                bool useHelper) {
+    stopBackgroundProbeTasks();
     const QString program = useHelper ? m_helperPath : m_executablePath;
     m_helperRunning = useHelper;
     m_helperResultSeen = false;
@@ -515,6 +572,9 @@ void ProbeRsEngine::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
             m_protectionOutput.clear();
             m_protectionProcess->start(m_helperPath, QStringList{"protection"} + helperTargetArgsFor(m_target));
         }
+    } else if (!success && m_connected) {
+        m_connected = false;
+        emit disconnected();
     }
 
     QString msg = success ? QString("%1 completed successfully.").arg(m_currentActionDescription)
@@ -559,6 +619,15 @@ void ProbeRsEngine::onProtectionFinished() {
     }
 }
 
+void ProbeRsEngine::onPingFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+    if (m_pingIgnoreResult || !m_connected || isBusy()) return;
+    if (exitCode == 0 && exitStatus == QProcess::NormalExit) return;
+
+    m_connected = false;
+    emit logMessage("The target no longer answers. The connection is closed.", EngineLogLevel::Warning);
+    emit disconnected();
+}
+
 void ProbeRsEngine::onProcessErrorOccurred(QProcess::ProcessError error) {
     if (error == QProcess::FailedToStart) {
         const bool helperFailed = m_helperRunning;
@@ -568,6 +637,10 @@ void ProbeRsEngine::onProcessErrorOccurred(QProcess::ProcessError error) {
             : QString("Failed to start '%1'. Please make sure probe-rs CLI is installed and available in PATH.").arg(m_executablePath);
         emit logMessage(msg, EngineLogLevel::Error);
         m_state = EngineState::Idle;
+        if (m_connected) {
+            m_connected = false;
+            emit disconnected();
+        }
         emit operationFinished(false, msg);
     }
 }

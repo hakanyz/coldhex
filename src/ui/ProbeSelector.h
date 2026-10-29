@@ -57,6 +57,7 @@ private:
     bool m_verbose = false;
     bool m_listSeen = false;
     bool m_lastError = false;
+    bool m_refreshPending = false;
     QStringList m_lastKeys;
     QStringList m_lastUsbKeys;
     int m_safetyTick = 0;
