@@ -179,6 +179,16 @@ MainWindow::MainWindow(QWidget *parent)
         m_capabilitiesTimer->start();
     });
 
+    // While connected and idle, check periodically whether the target board is still there.
+    m_targetCheckTimer = new QTimer(this);
+    m_targetCheckTimer->setInterval(1500);
+    connect(m_targetCheckTimer, &QTimer::timeout, this, [this]() {
+        if (m_engine->isConnected() && !m_isOperationRunning && !m_sequenceRunning && !m_engine->isBusy()
+            && !m_probeInspector->isRunning()) {
+            m_engine->checkTargetConnection();
+        }
+    });
+
     restoreSettings();
     m_chipSelector->requestChips();
 
@@ -1261,10 +1271,13 @@ void MainWindow::onEngineLogMessage(const QString& message, EngineLogLevel level
 }
 
 void MainWindow::onEngineConnected(bool success, const QString& chipInfo) {
-    m_isOperationRunning = false;
+    if (!m_sequenceRunning) {
+        m_isOperationRunning = false;
+    }
     updateUiState();
     if (success) {
         m_connectedProbe = m_probeSelector->selector();
+        m_targetCheckTimer->start();
         ui->statusBar->showMessage(QString("Target answered via %1 at %2 kHz (chip: %3, as selected)").arg(ui->comboInterface->currentText()).arg(speedKhz()).arg(chipInfo));
         // The wires work and the target answered. The chip name is the user's selection: nothing here
         // checks that the chip behind the probe really is that one.
@@ -1318,9 +1331,15 @@ void MainWindow::onProbeInspected(const QString& selector, const ProbeDetails& d
 }
 
 void MainWindow::onEngineDisconnected() {
-    m_isOperationRunning = false;
+    m_targetCheckTimer->stop();
+    if (!m_sequenceRunning) {
+        m_isOperationRunning = false;
+    }
     ui->statusBar->showMessage("Disconnected");
     updateUiState();
+    if (!m_isOperationRunning && !m_sequenceRunning && !m_engine->isBusy()) {
+        m_probeSelector->refresh(false);
+    }
 }
 
 void MainWindow::onSequenceStarted() {
@@ -1340,6 +1359,9 @@ void MainWindow::onSequenceFinished(bool success, const QString& message) {
     m_programRunning = false;
     m_sequenceRunning = false;
     m_isOperationRunning = false;
+    if (m_engine->isConnected()) {
+        m_targetCheckTimer->start();
+    }
     updateUiState();
     if (success) {
         appendLog("SUCCESS", message);

@@ -178,6 +178,7 @@ private:
     bool m_canLock = true;
     bool m_canUnlock = true;
     QTimer* m_capabilitiesTimer = nullptr;
+    QTimer* m_targetCheckTimer = nullptr;
     bool m_sequenceRunning = false;  // a flash or verify sequence of the coordinator is active
     bool m_manualConnect = false;  // the user pressed Connect (not a step of a sequence)
     QString m_connectedProbe;      // VID:PID[:serial] of the probe the connection was made with

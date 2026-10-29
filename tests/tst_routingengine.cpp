@@ -63,11 +63,13 @@ private slots:
         router.verifyFile("app.hex", 0x08000000);
         router.readMemory(0x08000000, 16, "out.bin");
         router.resetTarget();
-        QCOMPARE(jlink.commands.size(), 4);
+        router.checkTargetConnection();
+        QCOMPARE(jlink.commands.size(), 5);
         QVERIFY(jlink.commands.at(0).startsWith("program:app.hex"));
         QVERIFY(jlink.commands.at(1).startsWith("verify:app.hex"));
         QVERIFY(jlink.commands.at(2).startsWith("read:"));
         QCOMPARE(jlink.commands.at(3), QString("reset"));
+        QCOMPARE(jlink.commands.at(4), QString("checkTarget"));
     }
 
     void switchingTheProbeClosesTheOldConnection() {

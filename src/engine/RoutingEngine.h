@@ -21,6 +21,7 @@ public:
     void disconnectTarget() override;
     bool isConnected() const override;
     bool isBusy() const override;
+    void checkTargetConnection() override;
 
     void eraseTarget(bool fullErase = true) override;
     void unlockTarget() override;

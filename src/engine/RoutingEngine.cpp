@@ -46,6 +46,7 @@ bool RoutingEngine::connectTarget(const QString& chipName, uint32_t speedKhz, co
 void RoutingEngine::disconnectTarget() { m_active->disconnectTarget(); }
 bool RoutingEngine::isConnected() const { return m_active->isConnected(); }
 bool RoutingEngine::isBusy() const { return m_active->isBusy(); }
+void RoutingEngine::checkTargetConnection() { m_active->checkTargetConnection(); }
 
 void RoutingEngine::eraseTarget(bool fullErase) { m_active->eraseTarget(fullErase); }
 void RoutingEngine::unlockTarget() { m_active->unlockTarget(); }
