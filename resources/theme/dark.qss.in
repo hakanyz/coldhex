@@ -24,6 +24,12 @@
     QToolButton:disabled {
         color: @textDisabled@;
     }
+    QToolTip {
+        background-color: @consoleBase@;
+        color: @text@;
+        border: none;
+        padding: 0px;
+    }
     QDockWidget {
         color: @textBright@;
         font-weight: bold;
