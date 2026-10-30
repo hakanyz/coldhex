@@ -1,4 +1,6 @@
 #include "ui/Theme.h"
+#include <QApplication>
+#include <QPalette>
 #include <QColor>
 #include <QFile>
 #include <QRegularExpression>
@@ -45,6 +47,14 @@ private slots:
         const QString css = Theme::renderStyleSheet(QString::fromUtf8(file.readAll()));
         QVERIFY(!css.isEmpty());
         QVERIFY2(!css.contains('@'), "unresolved @name@ in dark.qss.in");
+    }
+
+    void toolTipTextIsReadableAgainstItsBackground() {
+        QApplication* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+        QVERIFY(app != nullptr);
+        Theme::applyDark(*app);
+        const QPalette p = app->palette();
+        QVERIFY(p.color(QPalette::ToolTipBase) != p.color(QPalette::ToolTipText));
     }
 };
 

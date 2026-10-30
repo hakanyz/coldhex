@@ -608,9 +608,6 @@
    <property name="text">
     <string>Read</string>
    </property>
-   <property name="toolTip">
-    <string>Read memory from target</string>
-   </property>
   </action>
   <action name="actionSaveRead">
    <property name="icon">
@@ -682,9 +679,6 @@
    </property>
    <property name="text">
     <string>Verify</string>
-   </property>
-   <property name="toolTip">
-    <string>Verify programmed memory</string>
    </property>
   </action>
   <action name="actionResetTarget">
